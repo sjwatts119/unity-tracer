@@ -16,6 +16,14 @@ Shader "RayTracer/RayShader"
             #define EPSILON 0.001       // A small value to offset rays to avoid self-intersection
 
             /*
+             * Material Types (instead of enum)
+             */
+            #define MATERIAL_LAMBERTIAN 0
+            #define MATERIAL_METAL 1
+            #define MATERIAL_GLASS 2
+            #define MATERIAL_LIGHT 3
+
+            /*
              * Structs
              */
 
@@ -33,11 +41,28 @@ Shader "RayTracer/RayShader"
 
             struct RayHit
             {
-                bool hit;
+                bool didHit;
                 float3 position;
                 float3 normal;
                 float t;
                 bool frontFace;
+            };
+
+            struct RayScatter
+            {
+                Ray scatteredRay;
+                float3 attenuation;
+                float3 emission;
+                bool didScatter;
+            };
+
+            struct Material
+            {
+                int type;
+                float3 albedo; // For Lambertian and Metal
+                float fuzz;    // For Metal
+                float refractiveIndex; // For Glass
+                float3 emission; // For Light
             };
 
             struct Sphere
@@ -205,6 +230,66 @@ Shader "RayTracer/RayShader"
              * Methods
              */
 
+            /*
+             * Material scattering
+             */
+
+            // Scatter the ray for a Lambertian (diffuse) material
+            RayScatter ScatterLambertian(Ray ray, RayHit hit, Material material, inout uint seed)
+            {
+                RayScatter scatter;
+
+                // Scatter the ray in a random direction against the normal
+                float3 scatterDirection = hit.normal + PCGRandomUnitVector(seed);
+
+                // Handle the degenerate case where the scatter direction is near zero
+                if (any(abs(scatterDirection) < EPSILON))
+                {
+                    scatterDirection = hit.normal; // Fallback to normal direction
+                }
+
+                // Build up the scatter info
+                scatter.scatteredRay = CreateRay(hit.position, normalize(scatterDirection));
+                scatter.attenuation = material.albedo;
+                scatter.emission = float3(0, 0, 0); // Lambertian does not emit light
+                scatter.didScatter = true; // Lambertian always scatters
+
+                return scatter;
+            }
+
+            // Scatter the ray for a Metal material
+            RayScatter ScatterMetal(Ray ray, RayHit hit, Material material, inout uint seed)
+            {
+                RayScatter scatter;
+
+                // Reflect the ray direction around the normal
+                float3 reflectDirection = reflect(ray.direction, hit.normal);
+
+                // Add fuzziness if the material has fuzz
+                // if (material.fuzz > 0.0)
+                // {
+                //     
+                // }
+
+                scatter.scatteredRay = CreateRay(hit.position, normalize(reflectDirection));
+                scatter.attenuation = material.albedo;
+                scatter.emission = float3(0, 0, 0); // Metal does not emit light
+                scatter.didScatter = true; // Metal always scatters for now (subject to change with fuzz)
+
+                return scatter;
+            }
+
+            // Get a scatter object based on the material type
+            RayScatter ScatterByMaterial(Ray ray, RayHit hit, Material material, inout uint seed)
+            {
+                if (material.type == MATERIAL_METAL)
+                {
+                    return ScatterMetal(ray, hit, material, seed); // Placeholder
+                }
+
+                return ScatterLambertian(ray, hit, material, seed); // Default to Lambertian for now
+            }
+
             // Runs per vertex
             VertexToFragment RayTracerVertexShader(appdata_base meshVertexData)
             {
@@ -254,7 +339,7 @@ Shader "RayTracer/RayShader"
                 }
 
                 // We have a valid intersection within the ray interval, so populate the hit info
-                hit.hit = true;
+                hit.didHit = true;
                 hit.t = root;
                 hit.position = RayAt(ray, root).origin;
                 float3 outwardNormal = (hit.position - sphere.centre) / sphere.radius;
@@ -297,7 +382,7 @@ Shader "RayTracer/RayShader"
                     RayHit hit = RayHitsSphere(ray, CreateInterval(EPSILON, closestHit.t), sphere);
 
                     // If we have a hit and it's closer than our current closest hit, update closest hit
-                    if (hit.hit && hit.t < closestHit.t)
+                    if (hit.didHit && hit.t < closestHit.t)
                     {
                         closestHit = hit;
                     }
@@ -318,7 +403,7 @@ Shader "RayTracer/RayShader"
                     RayHit hit = GetHit(ray);
 
                     // Did this ray hit anything?
-                    if (!hit.hit)
+                    if (!hit.didHit)
                     {
                         float3 backgroundGradient = lerp(float3(1.0, 1.0, 1.0), float3(0.8, 0.1, 0.5), 0.5 * (normalize(ray.direction).y + 1.0));
                         
@@ -328,9 +413,38 @@ Shader "RayTracer/RayShader"
                     }
 
                     // We hit something, so scatter the ray and attenuate the colour by 0.5 (50% energy loss per bounce)
-                    ray.origin = hit.position;
-                    ray.direction = PCGRandomUnitVectorOnHemisphere(hit.normal, seed);
-                    rayColour *= 0.5;
+                    // ray.origin = hit.position;
+                    // ray.direction = PCGRandomUnitVectorOnHemisphere(hit.normal, seed);
+                    // rayColour *= 0.5;
+
+                    // Set up a test lambertian material object
+                    Material testLambertian;
+                    testLambertian.type = MATERIAL_LAMBERTIAN;
+                    testLambertian.albedo = float3(0.8, 0.3, 0.3); // Red albedo
+                    testLambertian.emission = float3(0, 0, 0); // No emission
+                    testLambertian.fuzz = 0.0;
+                    testLambertian.refractiveIndex = 1.0;
+
+                    Material testMetal;
+                    testMetal.type = MATERIAL_METAL;
+                    testMetal.albedo = float3(0.8, 0.8, 0.8); // Grey albedo
+                    testMetal.emission = float3(0 , 0, 0); // No emission
+                    testMetal.fuzz = 0.0;
+                    testMetal.refractiveIndex = 1.0;
+                    
+                    RayScatter scatter = ScatterByMaterial(ray, hit, testMetal, seed);
+
+                    // If the material didn't scatter, it was absorbed so simply return black
+                    if (!scatter.didScatter) 
+                    {
+                        rayColour = float3(0, 0, 0);
+                        break;
+                    }
+
+                    // Now we can alter the ray based on the effects of the material
+                    ray = scatter.scatteredRay;
+                    rayColour *= scatter.attenuation;
+                    rayColour += scatter.emission * rayColour;
                 }
                 
                 return rayColour;
