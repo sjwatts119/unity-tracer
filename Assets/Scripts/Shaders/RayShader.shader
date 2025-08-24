@@ -52,14 +52,26 @@ Shader "RayTracer/RayShader"
             }
 
             /*
-             * Buffers
+             * Passed in buffer data
              */
 
+            // Sphere
             StructuredBuffer<Sphere> SphereBuffer;
+            int SphereCount;
+
+            // Camera
+            float CameraFocalDistance;
+            float CameraPlaneWidth;
+            float CameraPlaneHeight;
 
             /*
              * Methods
              */
+
+            float RadiansToDegrees(float radians)
+            {
+                return radians * (180.0 / UNITY_PI);
+            }
 
             // Runs per vertex
             VertexToFragment RayTracerVertexShader(appdata_base meshVertexData)
@@ -93,14 +105,16 @@ Shader "RayTracer/RayShader"
             fixed4 GetRayColour(Ray ray)
             {
                 // For now, we will just use the first sphere we have passed in via our buffer
-                Sphere sphere = SphereBuffer[0];
-                
-                if (RayHitsSphere(ray, sphere))
+                for (int i = 0; i < SphereCount; i++)
                 {
-                    // Draw the sphere in red for now
-                    return float4(1.0, 0.0, 0.0, 1.0);
+                    if (RayHitsSphere(ray, SphereBuffer[i]))
+                    {
+                        // Draw the sphere in red for now
+                        return float4(1.0, 0.0, 0.0, 1.0);
+                    }
                 }
-                
+
+                // Otherwise, draw the background
                 // Get the unit vector of the ray direction
                 float3 unitDirection = normalize(ray.direction);
 
@@ -112,16 +126,19 @@ Shader "RayTracer/RayShader"
             // Runs per pixel, requires return of RGBA colour with each channel in range 0-1
             fixed4 RayTracerFragmentShader(VertexToFragment pixelData) : SV_Target
             {
-                // Convert pixel coordinates to device coordinates
-                float4 deviceCoordinates = float4(pixelData.pixelCoordinates * 2.0 - 1.0, 1.0, 1.0);
+                // Convert pixel coordinates (0-1) to image plane coordinates
+                float2 imagePlanePosition = (pixelData.pixelCoordinates - 0.5) * float2(CameraPlaneWidth, CameraPlaneHeight);
 
-                // Get ray direction in camera space by multiplying against the current position of the camera
-                float3 cameraSpaceDirection = mul(unity_CameraInvProjection, deviceCoordinates).xyz;
+                // Ray direction in camera space
+                float3 cameraRayDirection = normalize(float3(imagePlanePosition.x, imagePlanePosition.y, CameraFocalDistance));
 
-                // Transform the ray's direction into world space
-                float3 rayDirection = normalize(mul(unity_CameraToWorld, float4(cameraSpaceDirection, 0.0)).xyz);
+                // Transform ray directionto world space
+                float3 rayDirection = normalize(mul((float3x3)unity_CameraToWorld, cameraRayDirection));
 
-                return GetRayColour(CreateRay(_WorldSpaceCameraPos,rayDirection));
+                // Ray origin is from the camera position in world space for now (subject to change for depth of field)
+                float3 rayOrigin = _WorldSpaceCameraPos;
+
+                return GetRayColour(CreateRay(rayOrigin, rayDirection));
             }
             ENDCG
         }
