@@ -9,12 +9,32 @@ Shader "RayTracer/RayShader"
             #pragma fragment RayTracerFragmentShader
             #include "UnityCG.cginc"
 
+            /*
+             * Structs
+             */
+            
             struct Ray
             {
                 float3 origin;
                 float3 direction;
             };
 
+            struct Sphere
+            {
+                float3 centre;
+                float radius;
+            };
+
+            struct VertexToFragment
+            {
+                float4 screenPosition : SV_POSITION;
+                float2 pixelCoordinates : TEXCOORD0;
+            };
+
+            /*
+             * Struct "Constructors"
+             */
+            
             Ray CreateRay(float3 origin, float3 direction)
             {
                 Ray ray;
@@ -22,12 +42,6 @@ Shader "RayTracer/RayShader"
                 ray.direction = direction;
                 return ray;
             }
-
-            struct Sphere
-            {
-                float3 centre;
-                float radius;
-            };
 
             Sphere CreateSphere(float3 centre, float radius)
             {
@@ -37,11 +51,15 @@ Shader "RayTracer/RayShader"
                 return sphere;
             }
 
-            struct VertexToFragment
-            {
-                float4 screenPosition : SV_POSITION;
-                float2 pixelCoordinates : TEXCOORD0;
-            };
+            /*
+             * Buffers
+             */
+
+            StructuredBuffer<Sphere> SphereBuffer;
+
+            /*
+             * Methods
+             */
 
             // Runs per vertex
             VertexToFragment RayTracerVertexShader(appdata_base meshVertexData)
@@ -74,10 +92,8 @@ Shader "RayTracer/RayShader"
 
             fixed4 GetRayColour(Ray ray)
             {
-                Sphere sphere = CreateSphere(
-                    float3(0, 0, -1),
-                    0.5
-                );
+                // For now, we will just use the first sphere we have passed in via our buffer
+                Sphere sphere = SphereBuffer[0];
                 
                 if (RayHitsSphere(ray, sphere))
                 {
