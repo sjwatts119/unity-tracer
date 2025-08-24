@@ -230,7 +230,7 @@ Shader "RayTracer/RayShader"
                 // Positive: Ray intersects the sphere at two points (entry and exit)
                 float discriminant = h * h - a * c;
 
-                // Initialize hit info with hit set to false for now
+                // Initialise hit info with hit set to false for now
                 RayHit hit = (RayHit)0;
 
                 // If the discriminant is negative, the ray misses the sphere, so return our miss
@@ -312,20 +312,22 @@ Shader "RayTracer/RayShader"
             fixed3 GetRayColour(Ray ray, inout uint seed)
             {
                 float3 rayColour = float3(1, 1, 1);
-                float3 backgroundColour = float3(0.5, 0.7, 1.0); // Light blue background
                 
                 for (int depth = 0; depth < RayMaxDepth; depth++)
                 {
                     RayHit hit = GetHit(ray);
-                    
+
+                    // Did this ray hit anything?
                     if (!hit.hit)
                     {
-                        // If we hit nothing, return our current colour multiplied by the background gradient
-                        float t = 0.5 * (normalize(ray.direction).y + 1.0);
-                        rayColour *= backgroundColour;
+                        float3 backgroundGradient = lerp(float3(1.0, 1.0, 1.0), float3(0.8, 0.1, 0.5), 0.5 * (normalize(ray.direction).y + 1.0));
+                        
+                        // If we hit nothing, so simply return our calculated colour so far attenuated by our background gradient
+                        rayColour *= backgroundGradient;
                         break;
                     }
-                    
+
+                    // We hit something, so scatter the ray and attenuate the colour by 0.5 (50% energy loss per bounce)
                     ray.origin = hit.position;
                     ray.direction = PCGRandomUnitVectorOnHemisphere(hit.normal, seed);
                     rayColour *= 0.5;
@@ -344,7 +346,7 @@ Shader "RayTracer/RayShader"
                 uint pixelSeed = pixelCoord.x * 73856093u ^ pixelCoord.y * 19349663u;
 
                 // Start at black as if we have no intersections, light wouldn't be reflected to the camera
-                float3 pixelColor = float3(0, 0, 0);
+                float3 pixelColour = float3(0, 0, 0);
                 
                 // Sample multiple rays per pixel for anti-aliasing
                 for (int sample = 0; sample < SamplesPerPixel; sample++)
@@ -352,21 +354,21 @@ Shader "RayTracer/RayShader"
                     // Make a seed for this sample
                     uint sampleSeed = pixelSeed + sample * 12345u;
                     
-                    // Generate PCG-based random offset for this sample
+                    // Generate random offset for this sample
                     float2 offset = PCGSampleSquare(sampleSeed);
                     
                     // Get ray with random offset
                     Ray ray = GetRay(pixelData.pixelCoordinates, offset);
                     
-                    // Accumulate color using the same seed state
-                    pixelColor += GetRayColour(ray, sampleSeed);
+                    // Accumulate colour
+                    pixelColour += GetRayColour(ray, sampleSeed);
                 }
                 
                 // Average the samples
                 float pixelSampleScale = 1.0 / SamplesPerPixel;
-                pixelColor *= pixelSampleScale;
+                pixelColour *= pixelSampleScale;
 
-                return fixed4(pixelColor, 1.0);
+                return fixed4(pixelColour, 1.0);
             }
             ENDCG
         }
