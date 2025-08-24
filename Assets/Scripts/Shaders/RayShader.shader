@@ -147,26 +147,27 @@ Shader "RayTracer/RayShader"
                 return float3(PCGRandomFloatInRange(state, min, max), PCGRandomFloatInRange(state, min, max), PCGRandomFloatInRange(state, min, max));
             }
 
+            // Generate a random unit vector using the Marsaglia method
             float3 PCGRandomUnitVector(inout uint state)
             {
-                for (int i = 0; i < 64; i++) // Add maximum iteration limit
-                {
-                    float3 p = PCGRandomVectorInRange(state, -1, 1);
-                    float pLengthSquared = dot(p, p);
-                    if (1e-160 < pLengthSquared && pLengthSquared <= 1)
-                    {
-                        return p / sqrt(pLengthSquared);
-                    }
-                }
-                // Fallback if we can't find a valid vector (very rare)
-                return float3(0, 1, 0);
+                float u1, u2, s;
+
+                do {
+                    u1 = PCGRandomFloatInRange(state, -1.0, 1.0);
+                    u2 = PCGRandomFloatInRange(state, -1.0, 1.0);
+                    s = u1 * u1 + u2 * u2;
+                } while (s >= 1.0 || s == 0.0);
+
+                float factor = 2.0 * sqrt(1.0 - s);
+                return float3(u1 * factor, u2 * factor, 1.0 - 2.0 * s);
             }
 
             float3 PCGRandomUnitVectorOnHemisphere(float3 normal, inout uint state)
             {
                 float3 inUnitSphere = PCGRandomUnitVector(state);
-                
-                if (dot(inUnitSphere, normal) > 0.0) // In the same hemisphere as the normal
+
+                // Check if the random vector is in the same hemisphere as the normal, if not, invert it
+                if (dot(inUnitSphere, normal) > 0.0) 
                     return inUnitSphere;
                 else
                     return -inUnitSphere;
