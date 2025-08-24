@@ -65,13 +65,18 @@ Shader "RayTracer/RayShader"
             float CameraPlaneHeight;
 
             /*
-             * Methods
+             * Helper Methods
              */
 
-            float RadiansToDegrees(float radians)
+            // Get a point along the ray at distance t from the origin
+            Ray RayAt(Ray ray, float t)
             {
-                return radians * (180.0 / UNITY_PI);
+                return CreateRay(ray.origin + t * ray.direction, ray.direction);
             }
+
+            /*
+             * Methods
+             */
 
             // Runs per vertex
             VertexToFragment RayTracerVertexShader(appdata_base meshVertexData)
@@ -82,24 +87,29 @@ Shader "RayTracer/RayShader"
                 return vertexOutput;
             }
             
-            bool RayHitsSphere(Ray ray, Sphere sphere)
+            float RayHitsSphere(Ray ray, Sphere sphere)
             {
                 // Get the vector from the ray's origin to the sphere's centre
                 float3 originToCentre = ray.origin - sphere.centre;
 
                 // Calculate quadratic coefficients
                 float a = dot(ray.direction, ray.direction);
-                float b = 2.0 * dot(ray.direction, originToCentre);
+                float h = dot(ray.direction, originToCentre);
                 float c = dot(originToCentre, originToCentre) - sphere.radius * sphere.radius;
 
                 // Now we can solve for three scenarios:
                 // Negative: Ray misses the sphere entirely
                 // Zero: Ray is tangent to the sphere (touches at exactly one point)
                 // Positive: Ray intersects the sphere at two points (entry and exit)
-                float discriminant = b * b - 4.0 * a * c;
+                float discriminant = h * h - a * c;
 
-                // Return whether or not the ray hits the sphere
-                return (discriminant >= 0);
+                if (discriminant < 0)
+                {
+                    return -1.0f; // No intersection
+                }
+
+                // We know we have an intersection, so return the nearest intersection distance
+                return (-h - sqrt(discriminant)) / a;
             }
 
             fixed4 GetRayColour(Ray ray)
@@ -107,14 +117,19 @@ Shader "RayTracer/RayShader"
                 // For now, we will just use the first sphere we have passed in via our buffer
                 for (int i = 0; i < SphereCount; i++)
                 {
-                    if (RayHitsSphere(ray, SphereBuffer[i]))
+                    float t = RayHitsSphere(ray, SphereBuffer[i]);
+                    if (t > 0.0)
                     {
-                        // Draw the sphere in red for now
-                        return float4(1.0, 0.0, 0.0, 1.0);
+                        // Get the normal at the intersection point
+                        float3 N = normalize(RayAt(ray, t).origin - SphereBuffer[i].centre);
+
+                        // Return a nice normal-based colour for now
+                        return 0.5 * float4(N.x + 1, N.y + 1, N.z + 1, 1.0);
                     }
                 }
 
                 // Otherwise, draw the background
+                
                 // Get the unit vector of the ray direction
                 float3 unitDirection = normalize(ray.direction);
 
