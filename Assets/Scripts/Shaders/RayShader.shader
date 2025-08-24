@@ -128,11 +128,8 @@ Shader "RayTracer/RayShader"
             }
 
             // Random offset in range [-0.5, 0.5] using PCG algorithm
-            float2 PCGSampleSquare(uint2 pixelCoord, uint sampleIndex)
+            float2 PCGSampleSquare(inout uint seed)
             {
-                // Create a unique seed based on pixel coordinates and sample index
-                uint seed = pixelCoord.x * 73856093u ^ pixelCoord.y * 19349663u ^ sampleIndex * 83492791u;
-                
                 // Generate two random floats in range [-0.5, 0.5]
                 float offsetX = PCGRandomFloatInRange(seed, -0.5, 0.5);
                 float offsetY = PCGRandomFloatInRange(seed, -0.5, 0.5);
@@ -311,11 +308,10 @@ Shader "RayTracer/RayShader"
             }
 
             // Get the colour for a ray by tracing it through the scene
-            fixed3 GetRayColour(Ray ray, uint seed)
+            fixed3 GetRayColour(Ray ray, inout uint seed)
             {
                 float3 rayColour = float3(1, 1, 1);
                 float3 backgroundColour = float3(0.5, 0.7, 1.0); // Light blue background
-
                 
                 for (int depth = 0; depth < RayMaxDepth; depth++)
                 {
@@ -329,9 +325,8 @@ Shader "RayTracer/RayShader"
                         break;
                     }
                     
-                    uint state = seed + depth * 12345u;
                     ray.origin = hit.position;
-                    ray.direction = PCGRandomUnitVectorOnHemisphere(hit.normal, state);
+                    ray.direction = PCGRandomUnitVectorOnHemisphere(hit.normal, seed);
                     rayColour *= 0.5;
                 }
                 
@@ -344,19 +339,26 @@ Shader "RayTracer/RayShader"
                 // Get pixel coordinates
                 uint2 pixelCoord = uint2(pixelData.pixelCoordinates * _ScreenParams.xy);
 
+                // Generate an RNG seed for this pixel
+                uint pixelSeed = pixelCoord.x * 73856093u ^ pixelCoord.y * 19349663u;
+
                 // Start at black as if we have no intersections, light wouldn't be reflected to the camera
                 float3 pixelColor = float3(0, 0, 0);
                 
                 // Sample multiple rays per pixel for anti-aliasing
                 for (int sample = 0; sample < SamplesPerPixel; sample++)
                 {
+                    // Make a seed for this sample
+                    uint sampleSeed = pixelSeed + sample * 12345u;
+                    
                     // Generate PCG-based random offset for this sample
-                    float2 offset = PCGSampleSquare(pixelCoord, uint(sample));
+                    float2 offset = PCGSampleSquare(sampleSeed);
                     
                     // Get ray with random offset
                     Ray ray = GetRay(pixelData.pixelCoordinates, offset);
-                    // Accumulate color
-                    pixelColor += GetRayColour(ray, (pixelCoord.x << 16) | (pixelCoord.y << 8) | sample);
+                    
+                    // Accumulate color using the same seed state
+                    pixelColor += GetRayColour(ray, sampleSeed);
                 }
                 
                 // Average the samples
