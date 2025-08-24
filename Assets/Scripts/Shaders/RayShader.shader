@@ -10,13 +10,34 @@ Shader "RayTracer/RayShader"
             #include "UnityCG.cginc"
 
             /*
+             * Constants
+             */
+            #define INFINITY (1.0 / 0.0) // Positive infinity
+            #define EPSILON 0.0001       // A small value to offset rays to avoid self-intersection
+
+            /*
              * Structs
              */
+
+            struct Interval
+            {
+                float min;
+                float max;
+            };
             
             struct Ray
             {
                 float3 origin;
                 float3 direction;
+            };
+
+            struct RayHit
+            {
+                bool hit;
+                float3 position;
+                float3 normal;
+                float t;
+                bool frontFace;
             };
 
             struct Sphere
@@ -51,6 +72,14 @@ Shader "RayTracer/RayShader"
                 return sphere;
             }
 
+            Interval CreateInterval(float min, float max)
+            {
+                Interval interval;
+                interval.min = min;
+                interval.max = max;
+                return interval;
+            }
+
             /*
              * Passed in buffer data
              */
@@ -68,10 +97,37 @@ Shader "RayTracer/RayShader"
              * Helper Methods
              */
 
+            float DegreesToRadians(float degrees)
+            {
+                return degrees * UNITY_PI / 180.0;
+            }
+
             // Get a point along the ray at distance t from the origin
             Ray RayAt(Ray ray, float t)
             {
                 return CreateRay(ray.origin + t * ray.direction, ray.direction);
+            }
+
+            float IntervalSize(Interval interval)
+            {
+                return interval.max - interval.min;
+            }
+
+            bool IntervalContains(Interval interval, float value)
+            {
+                return value >= interval.min && value <= interval.max;
+            }
+
+            bool IntervalSurrounds(Interval interval, float value)
+            {
+                return interval.min < value && value < interval.max;
+            }
+
+            RayHit RayHitSetFaceNormal(RayHit hitRecord, Ray ray, float3 outwardNormal)
+            {
+                hitRecord.frontFace = dot(ray.direction, outwardNormal) < 0;
+                hitRecord.normal = hitRecord.frontFace ? outwardNormal : -outwardNormal;
+                return hitRecord;
             }
 
             /*
@@ -87,7 +143,7 @@ Shader "RayTracer/RayShader"
                 return vertexOutput;
             }
             
-            float RayHitsSphere(Ray ray, Sphere sphere)
+            RayHit RayHitsSphere(Ray ray, Interval rayInterval, Sphere sphere)
             {
                 // Get the vector from the ray's origin to the sphere's centre
                 float3 originToCentre = ray.origin - sphere.centre;
@@ -103,37 +159,66 @@ Shader "RayTracer/RayShader"
                 // Positive: Ray intersects the sphere at two points (entry and exit)
                 float discriminant = h * h - a * c;
 
+                // Initialize hit info with hit set to false for now
+                RayHit hit = (RayHit)0;
+
+                // If the discriminant is negative, the ray misses the sphere, so return our miss
                 if (discriminant < 0)
                 {
-                    return -1.0f; // No intersection
+                    return hit; // No intersection
                 }
 
-                // We know we have an intersection, so return the nearest intersection distance
-                return (-h - sqrt(discriminant)) / a;
+                // We have an intersection, so return the nearest intersection distance
+                float sqrtDiscriminant = sqrt(discriminant);
+                
+                // Find the nearest root that lies in the acceptable range.
+                float root = (-h - sqrtDiscriminant) / a;
+                if (!IntervalContains(rayInterval, root))
+                {
+                    root = (-h + sqrtDiscriminant) / a;
+                    if (!IntervalContains(rayInterval, root))
+                    {
+                        return hit;
+                    }
+                }
+
+                // We have a valid intersection within the ray interval, so populate the hit info
+                hit.hit = true;
+                hit.t = root;
+                hit.position = RayAt(ray, root).origin;
+                float3 outwardNormal = (hit.position - sphere.centre) / sphere.radius;
+                hit = RayHitSetFaceNormal(hit, ray, outwardNormal);
+                return hit;
             }
 
             fixed4 GetRayColour(Ray ray)
             {
-                // For now, we will just use the first sphere we have passed in via our buffer
+                // Set up variables to track the closest hit, starting at infinity distance
+                RayHit closestHit = (RayHit)0;
+                float closestT = INFINITY;
+
+                // Check for intersection with all spheres in the scene
                 for (int i = 0; i < SphereCount; i++)
                 {
-                    float t = RayHitsSphere(ray, SphereBuffer[i]);
-                    if (t > 0.0)
-                    {
-                        // Get the normal at the intersection point
-                        float3 N = normalize(RayAt(ray, t).origin - SphereBuffer[i].centre);
+                    // Check for intersection with this sphere
+                    RayHit hitRecord = RayHitsSphere(ray, CreateInterval(EPSILON, closestT), SphereBuffer[i]);
 
-                        // Return a nice normal-based colour for now
-                        return 0.5 * float4(N.x + 1, N.y + 1, N.z + 1, 1.0);
+                    // If we hit something and it's closer than our previous closest hit, update our closest hit
+                    if (hitRecord.hit && hitRecord.t < closestT)
+                    {
+                        closestT = hitRecord.t;
+                        closestHit = hitRecord;
                     }
                 }
 
-                // Otherwise, draw the background
-                
-                // Get the unit vector of the ray direction
-                float3 unitDirection = normalize(ray.direction);
+                // If we hit something, shade based on the normal at the hit point
+                if (closestHit.hit)
+                {
+                    return 0.5f * (fixed4(closestHit.normal, 1.0) + fixed4(1.0, 1.0, 1.0, 1.0));
+                }
 
-                // Draw a background for now.
+                // If we didn't hit anything, return a gradient background colour
+                float3 unitDirection = normalize(ray.direction);
                 float a = 0.5 * (unitDirection.y + 1.0);
                 return (1.0 - a) * float4(1.0, 1.0, 1.0, 1.0) + a * float4(0.5, 0.7, 1.0, 1.0);
             }
