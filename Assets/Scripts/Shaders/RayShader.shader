@@ -432,7 +432,7 @@ Shader "RayTracer/RayShader"
                     testMetal.fuzz = 0.0;
                     testMetal.refractiveIndex = 1.0;
                     
-                    RayScatter scatter = ScatterByMaterial(ray, hit, testMetal, seed);
+                    RayScatter scatter = ScatterByMaterial(ray, hit, testLambertian, seed);
 
                     // If the material didn't scatter, it was absorbed so simply return black
                     if (!scatter.didScatter) 
@@ -445,6 +445,20 @@ Shader "RayTracer/RayShader"
                     ray = scatter.scatteredRay;
                     rayColour *= scatter.attenuation;
                     rayColour += scatter.emission * rayColour;
+
+                    // Russian roulette termination to prevent spending resources on hardly contributing rays
+                    if (depth < 3) continue; // Don't terminate the first few bounces
+
+                    // Don't terminate if the ray is still bright (over 10% in any channel)
+                    float maxComponent = max(rayColour.r, max(rayColour.g, rayColour.b));
+                    if ( maxComponent > 0.1) continue;
+
+                    // Survival probability is directly proportional to brightness
+                    // Dimmer rays are more likely to be terminated
+                    if (PCGRandomFloat(seed) > maxComponent) break;
+
+                    // Survived, so scale up the colour to maintain energy
+                    rayColour /= maxComponent;
                 }
                 
                 return rayColour;
