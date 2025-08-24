@@ -13,7 +13,7 @@ Shader "RayTracer/RayShader"
              * Constants
              */
             #define INFINITY (1.0 / 0.0) // Positive infinity
-            #define EPSILON 0.0001       // A small value to offset rays to avoid self-intersection
+            #define EPSILON 0.001       // A small value to offset rays to avoid self-intersection
 
             /*
              * Structs
@@ -96,6 +96,9 @@ Shader "RayTracer/RayShader"
             // Anti-aliasing
             int SamplesPerPixel;
 
+            // Ray Tracing
+            int RayMaxDepth;
+
             /*
              * Helper Methods
              */
@@ -125,7 +128,7 @@ Shader "RayTracer/RayShader"
             }
 
             // Random offset in range [-0.5, 0.5] using PCG algorithm
-            float2 SampleSquarePCG(uint2 pixelCoord, uint sampleIndex)
+            float2 PCGSampleSquare(uint2 pixelCoord, uint sampleIndex)
             {
                 // Create a unique seed based on pixel coordinates and sample index
                 uint seed = pixelCoord.x * 73856093u ^ pixelCoord.y * 19349663u ^ sampleIndex * 83492791u;
@@ -135,6 +138,41 @@ Shader "RayTracer/RayShader"
                 float offsetY = PCGRandomFloatInRange(seed, -0.5, 0.5);
                 
                 return float2(offsetX, offsetY);
+            }
+
+            float3 PCGRandomVector(inout uint state)
+            {
+                return float3(PCGRandomFloat(state), PCGRandomFloat(state), PCGRandomFloat(state));
+            }
+
+            float3 PCGRandomVectorInRange(inout uint state, float min, float max)
+            {
+                return float3(PCGRandomFloatInRange(state, min, max), PCGRandomFloatInRange(state, min, max), PCGRandomFloatInRange(state, min, max));
+            }
+
+            float3 PCGRandomUnitVector(inout uint state)
+            {
+                for (int i = 0; i < 64; i++) // Add maximum iteration limit
+                {
+                    float3 p = PCGRandomVectorInRange(state, -1, 1);
+                    float pLengthSquared = dot(p, p);
+                    if (1e-160 < pLengthSquared && pLengthSquared <= 1)
+                    {
+                        return p / sqrt(pLengthSquared);
+                    }
+                }
+                // Fallback if we can't find a valid vector (very rare)
+                return float3(0, 1, 0);
+            }
+
+            float3 PCGRandomUnitVectorOnHemisphere(float3 normal, inout uint state)
+            {
+                float3 inUnitSphere = PCGRandomUnitVector(state);
+                
+                if (dot(inUnitSphere, normal) > 0.0) // In the same hemisphere as the normal
+                    return inUnitSphere;
+                else
+                    return -inUnitSphere;
             }
 
             // Get a point along the ray at distance t from the origin
@@ -226,38 +264,6 @@ Shader "RayTracer/RayShader"
                 return hit;
             }
 
-            fixed3 GetRayColour(Ray ray)
-            {
-                // Set up variables to track the closest hit, starting at infinity distance
-                RayHit closestHit = (RayHit)0;
-                float closestT = INFINITY;
-
-                // Check for intersection with all spheres in the scene
-                for (int i = 0; i < SphereCount; i++)
-                {
-                    // Check for intersection with this sphere
-                    RayHit hitRecord = RayHitsSphere(ray, CreateInterval(EPSILON, closestT), SphereBuffer[i]);
-
-                    // If we hit something and it's closer than our previous closest hit, update our closest hit
-                    if (hitRecord.hit && hitRecord.t < closestT)
-                    {
-                        closestT = hitRecord.t;
-                        closestHit = hitRecord;
-                    }
-                }
-
-                // If we hit something, shade based on the normal at the hit point
-                if (closestHit.hit)
-                {
-                    return 0.5f * (fixed4(closestHit.normal, 1.0) + fixed4(1.0, 1.0, 1.0, 1.0));
-                }
-
-                // If we didn't hit anything, return a gradient background colour
-                float3 unitDirection = normalize(ray.direction);
-                float a = 0.5 * (unitDirection.y + 1.0);
-                return (1.0 - a) * float3(1.0, 1.0, 1.0) + a * float3(0.5, 0.7, 1.0);
-            }
-
             // Get a ray for anti-aliasing sampling
             Ray GetRay(float2 uv, float2 offset)
             {
@@ -277,6 +283,61 @@ Shader "RayTracer/RayShader"
                 return CreateRay(rayOrigin, rayDirection);
             }
 
+            // Get the closest hit for a ray
+            RayHit GetHit(Ray ray)
+            {
+                // Start with no hit
+                RayHit closestHit = (RayHit)0;
+                closestHit.t = INFINITY;
+
+                // Iterate over all spheres to find the closest hit
+                for (int i = 0; i < SphereCount; i++)
+                {
+                    Sphere sphere = SphereBuffer[i];
+
+                    // Check for intersection with the sphere
+                    RayHit hit = RayHitsSphere(ray, CreateInterval(EPSILON, closestHit.t), sphere);
+
+                    // If we have a hit and it's closer than our current closest hit, update closest hit
+                    if (hit.hit && hit.t < closestHit.t)
+                    {
+                        closestHit = hit;
+                    }
+                }
+
+                // In the future, we can add more geometry type collision checks here
+
+                return closestHit;
+            }
+
+            // Get the colour for a ray by tracing it through the scene
+            fixed3 GetRayColour(Ray ray, uint seed)
+            {
+                float3 rayColour = float3(1, 1, 1);
+                float3 backgroundColour = float3(0.5, 0.7, 1.0); // Light blue background
+
+                
+                for (int depth = 0; depth < RayMaxDepth; depth++)
+                {
+                    RayHit hit = GetHit(ray);
+                    
+                    if (!hit.hit)
+                    {
+                        // If we hit nothing, return our current colour multiplied by the background gradient
+                        float t = 0.5 * (normalize(ray.direction).y + 1.0);
+                        rayColour *= backgroundColour;
+                        break;
+                    }
+                    
+                    uint state = seed + depth * 12345u;
+                    ray.origin = hit.position;
+                    ray.direction = PCGRandomUnitVectorOnHemisphere(hit.normal, state);
+                    rayColour *= 0.5;
+                }
+                
+                return rayColour;
+            }
+
             // Runs per pixel
             fixed4 RayTracerFragmentShader(VertexToFragment pixelData) : SV_Target
             {
@@ -290,12 +351,12 @@ Shader "RayTracer/RayShader"
                 for (int sample = 0; sample < SamplesPerPixel; sample++)
                 {
                     // Generate PCG-based random offset for this sample
-                    float2 offset = SampleSquarePCG(pixelCoord, uint(sample));
+                    float2 offset = PCGSampleSquare(pixelCoord, uint(sample));
                     
                     // Get ray with random offset
                     Ray ray = GetRay(pixelData.pixelCoordinates, offset);
                     // Accumulate color
-                    pixelColor += GetRayColour(ray);
+                    pixelColor += GetRayColour(ray, (pixelCoord.x << 16) | (pixelCoord.y << 8) | sample);
                 }
                 
                 // Average the samples

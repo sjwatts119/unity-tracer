@@ -12,6 +12,10 @@ public class RayTracedPostProcessor : MonoBehaviour
     [Range(1, 250)]
     public int samplesPerPixel;
     
+    [Header("Ray Tracing")]
+    [Range(1, 250)]
+    public int rayMaxDepth;
+    
     private ComputeBuffer _sphereBuffer;
     
     public static readonly int SphereBufferPropertyID = Shader.PropertyToID("SphereBuffer");
@@ -23,6 +27,8 @@ public class RayTracedPostProcessor : MonoBehaviour
     public static readonly int PixelDeltaUPropertyID = Shader.PropertyToID("PixelDeltaU");
     public static readonly int PixelDeltaVPropertyID = Shader.PropertyToID("PixelDeltaV");
     public static readonly int Pixel00LocPropertyID = Shader.PropertyToID("Pixel00Loc");
+    public static readonly int RayMaxDepthPropertyID = Shader.PropertyToID("RayMaxDepth");
+
     
 
     // Called after all rendering is complete to render image
@@ -31,6 +37,7 @@ public class RayTracedPostProcessor : MonoBehaviour
         var material = RayShader.Material;
         
         PopulateAntialiasingData(material);
+        PopulateRaytracingData(material);
         PopulateSphereData(material);
         PopulateCameraData(material, GetComponent<Camera>());
         
@@ -45,7 +52,7 @@ public class RayTracedPostProcessor : MonoBehaviour
         float planeHeight = 2.0f * focalDistance * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
         float planeWidth = planeHeight * camera.aspect;
         
-        // Calculate pixel spacing vectors for anti-aliasing
+        // Calculate pixel spacing vectors for antialiasing
         Vector3 pixelDeltaU = new Vector3(planeWidth / Screen.width, 0, 0);
         Vector3 pixelDeltaV = new Vector3(0, -planeHeight / Screen.height, 0); // Negative because screen Y is flipped
         
@@ -65,6 +72,11 @@ public class RayTracedPostProcessor : MonoBehaviour
     void PopulateAntialiasingData(Material material)
     {
         material.SetInt(SamplesPerPixelPropertyID, samplesPerPixel);
+    }
+    
+    void PopulateRaytracingData(Material material)
+    {
+        material.SetInt(RayMaxDepthPropertyID, rayMaxDepth);
     }
 
     // Populate the gpu compute buffer with sphere data from the scene
