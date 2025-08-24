@@ -92,6 +92,9 @@ Shader "RayTracer/RayShader"
             float CameraFocalDistance;
             float CameraPlaneWidth;
             float CameraPlaneHeight;
+            
+            // Anti-aliasing
+            int SamplesPerPixel;
 
             /*
              * Helper Methods
@@ -100,6 +103,38 @@ Shader "RayTracer/RayShader"
             float DegreesToRadians(float degrees)
             {
                 return degrees * UNITY_PI / 180.0;
+            }
+
+            // Generate next random uint32
+            uint PCGNext(inout uint state)
+            {
+                state = state * 747796405 + 2891336453;
+                uint result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
+                result = (result >> 22) ^ result;
+                return result;
+            }
+
+            float PCGRandomFloat(inout uint state)
+            {
+                return PCGNext(state) / 4294967295.0;
+            }
+
+            float PCGRandomFloatInRange(inout uint state, float min, float max)
+            {
+                return min + (max - min) * PCGRandomFloat(state);
+            }
+
+            // Random offset in range [-0.5, 0.5] using PCG algorithm
+            float2 SampleSquarePCG(uint2 pixelCoord, uint sampleIndex)
+            {
+                // Create a unique seed based on pixel coordinates and sample index
+                uint seed = pixelCoord.x * 73856093u ^ pixelCoord.y * 19349663u ^ sampleIndex * 83492791u;
+                
+                // Generate two random floats in range [-0.5, 0.5]
+                float offsetX = PCGRandomFloatInRange(seed, -0.5, 0.5);
+                float offsetY = PCGRandomFloatInRange(seed, -0.5, 0.5);
+                
+                return float2(offsetX, offsetY);
             }
 
             // Get a point along the ray at distance t from the origin
@@ -191,7 +226,7 @@ Shader "RayTracer/RayShader"
                 return hit;
             }
 
-            fixed4 GetRayColour(Ray ray)
+            fixed3 GetRayColour(Ray ray)
             {
                 // Set up variables to track the closest hit, starting at infinity distance
                 RayHit closestHit = (RayHit)0;
@@ -220,25 +255,54 @@ Shader "RayTracer/RayShader"
                 // If we didn't hit anything, return a gradient background colour
                 float3 unitDirection = normalize(ray.direction);
                 float a = 0.5 * (unitDirection.y + 1.0);
-                return (1.0 - a) * float4(1.0, 1.0, 1.0, 1.0) + a * float4(0.5, 0.7, 1.0, 1.0);
+                return (1.0 - a) * float3(1.0, 1.0, 1.0) + a * float3(0.5, 0.7, 1.0);
             }
 
-            // Runs per pixel, requires return of RGBA colour with each channel in range 0-1
-            fixed4 RayTracerFragmentShader(VertexToFragment pixelData) : SV_Target
+            // Get a ray for anti-aliasing sampling
+            Ray GetRay(float2 uv, float2 offset)
             {
-                // Convert pixel coordinates (0-1) to image plane coordinates
-                float2 imagePlanePosition = (pixelData.pixelCoordinates - 0.5) * float2(CameraPlaneWidth, CameraPlaneHeight);
+                // Convert UV coordinates (0-1) to image plane coordinates with offset
+                float2 offsetUV = uv + offset / float2(_ScreenParams.x, _ScreenParams.y);
+                float2 imagePlanePosition = (offsetUV - 0.5) * float2(CameraPlaneWidth, CameraPlaneHeight);
 
                 // Ray direction in camera space
                 float3 cameraRayDirection = normalize(float3(imagePlanePosition.x, imagePlanePosition.y, CameraFocalDistance));
 
-                // Transform ray directionto world space
+                // Transform ray direction to world space
                 float3 rayDirection = normalize(mul((float3x3)unity_CameraToWorld, cameraRayDirection));
 
                 // Ray origin is from the camera position in world space for now (subject to change for depth of field)
                 float3 rayOrigin = _WorldSpaceCameraPos;
 
-                return GetRayColour(CreateRay(rayOrigin, rayDirection));
+                return CreateRay(rayOrigin, rayDirection);
+            }
+
+            // Runs per pixel
+            fixed4 RayTracerFragmentShader(VertexToFragment pixelData) : SV_Target
+            {
+                // Get pixel coordinates
+                uint2 pixelCoord = uint2(pixelData.pixelCoordinates * _ScreenParams.xy);
+
+                // Start at black as if we have no intersections, light wouldn't be reflected to the camera
+                float3 pixelColor = float3(0, 0, 0);
+                
+                // Sample multiple rays per pixel for anti-aliasing
+                for (int sample = 0; sample < SamplesPerPixel; sample++)
+                {
+                    // Generate PCG-based random offset for this sample
+                    float2 offset = SampleSquarePCG(pixelCoord, uint(sample));
+                    
+                    // Get ray with random offset
+                    Ray ray = GetRay(pixelData.pixelCoordinates, offset);
+                    // Accumulate color
+                    pixelColor += GetRayColour(ray);
+                }
+                
+                // Average the samples
+                float pixelSampleScale = 1.0 / SamplesPerPixel;
+                pixelColor *= pixelSampleScale;
+
+                return fixed4(pixelColor, 1.0);
             }
             ENDCG
         }
