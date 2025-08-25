@@ -1,34 +1,40 @@
 using System;
-using System.Collections.Generic;
 using Core;
 using Geometry;
-using NUnit.Framework;
-using Unity.VisualScripting;
 using UnityEngine;
 using Plane = Geometry.Plane;
-
 
 [ExecuteAlways, ImageEffectAllowedInSceneView]
 public class RayTracedPostProcessor : MonoBehaviour
 {
+    [Header("Info")] 
+    public int renderedFrames;
+    
     [Header("Anti-Aliasing")]
-    [UnityEngine.Range(1, 250)]
+    [UnityEngine.Range(1, 1000)]
     public int samplesPerPixel;
     
     [Header("Ray Tracing")]
     [UnityEngine.Range(1, 250)]
     public int rayMaxDepth;
     
+    [Header("Rendering")]
+    public bool accumulateFrames = true;
+    
     [Header("Camera")]
     [UnityEngine.Range(0.1f, 50f)]
     public float cameraFocalDistance = 1.0f;
     
-    [Header("Camera")]
     [UnityEngine.Range(0.0f, 100f)]
     public float cameraDefocusAngle = 10f;
+
+    [Header("Accumulation")]
+    [SerializeField] private Shader accumulationShader;
     
     private ComputeBuffer _sphereBuffer;
     private ComputeBuffer _quadBuffer;
+    private RenderTexture _accumulatedTexture;
+    private Material _accumulationMaterial;
     
     public static readonly int SphereBufferPropertyID = Shader.PropertyToID("SphereBuffer");
     public static readonly int SphereCountPropertyID = Shader.PropertyToID("SphereCount");
@@ -41,20 +47,119 @@ public class RayTracedPostProcessor : MonoBehaviour
     public static readonly int CameraLocalToWorldPropertyID = Shader.PropertyToID("CameraLocalToWorld");
     public static readonly int SamplesPerPixelPropertyID = Shader.PropertyToID("SamplesPerPixel");
     public static readonly int RayMaxDepthPropertyID = Shader.PropertyToID("RayMaxDepth");
+    public static readonly int FrameNumberPropertyID = Shader.PropertyToID("FrameNumber");
+    public static readonly int PreviousTexturePropertyID = Shader.PropertyToID("PreviousTexture");
+
+    private void Start()
+    {
+        renderedFrames = 0;
+        InitialiseAccumulation();
+    }
 
     // Called after all rendering is complete to render image
     public void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
-        var material = RayShader.Material;
+        var rayMaterial = RayShader.Material;
         
-        PopulateAntialiasingData(material);
-        PopulateRaytracingData(material);
-        PopulateSphereData(material);
-        PopulateQuadData(material);
-        PopulateCameraData(material, GetComponent<Camera>());
-        
-        Graphics.Blit(source, destination, material);
+        // Populate shader data from scene and settings
+        PopulateAntialiasingData(rayMaterial);
+        PopulateRaytracingData(rayMaterial);
+        PopulateSphereData(rayMaterial);
+        PopulateQuadData(rayMaterial);
+        PopulateCameraData(rayMaterial, GetComponent<Camera>());
+        PopulateRenderingData(rayMaterial);
+
+        if (!accumulateFrames)
+        {
+            renderedFrames = 0;
+            Graphics.Blit(source, destination, rayMaterial);
+            return;
+        }
+
+        InitialiseAccumulation();
+        CreateAccumulationTexture(source.width, source.height);
+
+        // Create temporary copy of the previous accumulated frame
+        RenderTexture prevFrameCopy = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGBFloat);
+        Graphics.Blit(_accumulatedTexture, prevFrameCopy);
+
+        // Render the current frame with ray tracing
+        RenderTexture currentFrame = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGBFloat);
+        Graphics.Blit(source, currentFrame, rayMaterial);
+
+        // Blend current frame with accumulated previous frames
+        if (_accumulationMaterial != null)
+        {
+            _accumulationMaterial.SetInt(FrameNumberPropertyID, renderedFrames);
+            _accumulationMaterial.SetTexture(PreviousTexturePropertyID, prevFrameCopy);
+            Graphics.Blit(currentFrame, _accumulatedTexture, _accumulationMaterial);
+        }
+        else
+        {
+            // just overwrite if no accumulation material is set
+            Graphics.Blit(currentFrame, _accumulatedTexture);
+        }
+
+        // Present the accumulated result to screen
+        Graphics.Blit(_accumulatedTexture, destination);
+
+        // Clean up temporary textures
+        RenderTexture.ReleaseTemporary(currentFrame);
+        RenderTexture.ReleaseTemporary(prevFrameCopy);
+
+        renderedFrames++;
     }
+
+    void OnDisable()
+    {
+        ReleaseBuffers();
+        ReleaseTextures();
+    }
+
+    void OnDestroy()
+    {
+        ReleaseBuffers();
+        ReleaseTextures();
+    }
+    
+    // Reset accumulation when parameters change
+    void OnValidate()
+    {
+        if (Application.isPlaying)
+        {
+            renderedFrames = 0;
+            ReleaseTextures();
+        }
+    }
+
+    private void InitialiseAccumulation()
+    {
+        // Create accumulation material if needed
+        if (accumulationShader != null && _accumulationMaterial == null)
+        {
+            _accumulationMaterial = new Material(accumulationShader);
+        }
+    }
+
+    private void CreateAccumulationTexture(int width, int height)
+    {
+        // Create or recreate the accumulation texture if size has changed
+        if (_accumulatedTexture == null || _accumulatedTexture.width != width || _accumulatedTexture.height != height)
+        {
+            if (_accumulatedTexture != null)
+            {
+                _accumulatedTexture.Release();
+            }
+
+            _accumulatedTexture = new RenderTexture(width, height, 0, RenderTextureFormat.ARGBFloat);
+            _accumulatedTexture.enableRandomWrite = true;
+            _accumulatedTexture.Create();
+        }
+    }
+
+    /*
+     * Passing data to shaders
+     */
     
     void PopulateCameraData(Material material, Camera camera)
     {
@@ -62,7 +167,7 @@ public class RayTracedPostProcessor : MonoBehaviour
         float planeHeight = 2.0f * cameraFocalDistance * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
         float planeWidth = planeHeight * camera.aspect;
         
-        // Populate camera data
+        // Send camera parameters to shader
         material.SetFloat(CameraFocalDistancePropertyID, cameraFocalDistance);
         material.SetFloat(CameraDefocusAnglePropertyID, cameraDefocusAngle);
         material.SetFloat(CameraPlaneWidthPropertyID, planeWidth);
@@ -79,54 +184,63 @@ public class RayTracedPostProcessor : MonoBehaviour
     {
         material.SetInt(RayMaxDepthPropertyID, rayMaxDepth);
     }
+    
+    void PopulateRenderingData(Material material)
+    {
+        material.SetInt(FrameNumberPropertyID, accumulateFrames ? renderedFrames : 0);
+    }
 
-    // Populate the gpu compute buffer with sphere data from the scene
     void PopulateSphereData(Material material)
     {
         var spheres = FindObjectsByType<Sphere>(FindObjectsSortMode.None);
         
+        // Clean up existing buffer
         _sphereBuffer?.Release();
         _sphereBuffer = null;
         
+        // Early exit if no spheres in scene
         if (spheres.Length == 0)
         {
             material.SetInt(SphereCountPropertyID, 0);
             return;
         }
 
+        // Convert scene spheres to shader data format
         var sphereData = new ShaderStructs.Sphere[spheres.Length];
         for (int i = 0; i < spheres.Length; i++)
         {
             sphereData[i] = spheres[i].ToShaderData();
         }
 
-        // Populate the compute buffer with sphere data
+        // Create and populate compute buffer
         _sphereBuffer = new ComputeBuffer(sphereData.Length, System.Runtime.InteropServices.Marshal.SizeOf<ShaderStructs.Sphere>());
         _sphereBuffer.SetData(sphereData);
         
-        // Bind the buffer and count to the shader
+        // Bind buffer to shader
         material.SetBuffer(SphereBufferPropertyID, _sphereBuffer);
         material.SetInt(SphereCountPropertyID, sphereData.Length);
     }
 
-// Replace the PopulateQuadData method in your RayTracedPostProcessor class
     void PopulateQuadData(Material material)
     {
-        // Find both quads and planes
+        // Find both quad and plane objects in scene
         var quads = FindObjectsByType<Quad>(FindObjectsSortMode.None);
         var planes = FindObjectsByType<Plane>(FindObjectsSortMode.None);
     
+        // Clean up existing buffer
         _quadBuffer?.Release();
         _quadBuffer = null;
     
         int totalCount = quads.Length + planes.Length;
     
+        // Early exit if no quads or planes in scene
         if (totalCount == 0)
         {
             material.SetInt(QuadCountPropertyID, 0);
             return;
         }
     
+        // Combine quads and planes into single buffer
         var quadData = new ShaderStructs.Quad[totalCount];
         int index = 0;
     
@@ -135,31 +249,32 @@ public class RayTracedPostProcessor : MonoBehaviour
             quadData[index++] = quads[i].ToShaderData();
         }
     
-        // Add all planes to the buffer
         for (int i = 0; i < planes.Length; i++)
         {
             quadData[index++] = planes[i].ToShaderData();
         }
     
-        // Populate the compute buffer with combined quad/plane data
+        // Create and populate compute buffer
         _quadBuffer = new ComputeBuffer(quadData.Length, System.Runtime.InteropServices.Marshal.SizeOf<ShaderStructs.Quad>());
         _quadBuffer.SetData(quadData);
     
-        // Bind the buffer and count to the shader
+        // Bind buffer to shader
         material.SetBuffer(QuadBufferPropertyID, _quadBuffer);
         material.SetInt(QuadCountPropertyID, quadData.Length);
     }
 
-    // Release the compute buffer when disabled or destroyed
-    void OnDisable()
+    void ReleaseBuffers()
     {
         _sphereBuffer?.Release();
         _quadBuffer?.Release();
     }
 
-    void OnDestroy()
+    void ReleaseTextures()
     {
-        _sphereBuffer?.Release();
-        _quadBuffer?.Release();
+        if (_accumulatedTexture != null)
+        {
+            _accumulatedTexture.Release();
+            _accumulatedTexture = null;
+        }
     }
 }

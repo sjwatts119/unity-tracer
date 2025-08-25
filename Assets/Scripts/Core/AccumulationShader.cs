@@ -3,9 +3,9 @@ using UnityEngine;
 
 namespace Core
 {
-    public class RayShader
+    public class AccumulationShader
     {
-        private const string Name = "RayTracer/RayShader";
+        private const string Name = "RayTracer/AccumulationShader";
         private static Material _material;
 
         public static Material Material

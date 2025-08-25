@@ -5,19 +5,21 @@ Shader "RayTracer/RayShader"
         Pass
         {
             CGPROGRAM
-            #pragma vertex RayTracerVertexShader
-            #pragma fragment RayTracerFragmentShader
+            #pragma vertex RayVertexShader
+            #pragma fragment RayFragmentShader
             #include "UnityCG.cginc"
 
             /*
              * Constants
              */
+            
             #define INFINITY (1.0 / 0.0) // Positive infinity
             #define EPSILON 0.001       // A small value to offset rays to avoid self-intersection
 
             /*
              * Material Types
              */
+            
             #define MATERIAL_LAMBERTIAN 0
             #define MATERIAL_METAL 1
             #define MATERIAL_DIELECTRIC 2
@@ -26,7 +28,7 @@ Shader "RayTracer/RayShader"
             /*
              * Structs
              */
-
+            
             struct Material
             {
                 int type;
@@ -117,7 +119,7 @@ Shader "RayTracer/RayShader"
             }
 
             /*
-             * Passed in buffer data
+             * Passed Parameters
              */
 
             // Sphere
@@ -140,6 +142,9 @@ Shader "RayTracer/RayShader"
 
             // Ray Tracing
             int RayMaxDepth;
+
+            // Other
+            int FrameNumber;
 
             /*
              * Helper Methods
@@ -226,6 +231,26 @@ Shader "RayTracer/RayShader"
                 else
                     return -inUnitSphere;
             }
+
+            // Thanks https://github.com/SebLague for this
+			// Random value in normal distribution (with mean=0 and sd=1)
+			float PCGRandomValueNormalDistribution(inout uint state)
+			{
+				float theta = 2 * 3.1415926 * PCGRandomFloat(state);
+				float rho = sqrt(-2 * log(PCGRandomFloat(state)));
+				return rho * cos(theta);
+			}
+
+            // Thanks https://github.com/SebLague for this
+			// Calculate a random direction
+			float3 PCGRandomDirection(inout uint state)
+			{
+				float x = PCGRandomValueNormalDistribution(state);
+				float y = PCGRandomValueNormalDistribution(state);
+				float z = PCGRandomValueNormalDistribution(state);
+				return normalize(float3(x, y, z));
+			}
+            
             // Get a point along the ray at distance t from the origin
             Ray RayAt(Ray ray, float t)
             {
@@ -284,8 +309,8 @@ Shader "RayTracer/RayShader"
             {
                 RayScatter scatter;
 
-                // Scatter the ray in a random direction against the normal
-                float3 scatterDirection = hit.normal + PCGRandomUnitVector(seed);
+                // Scatter the ray in a random direction against the normal (using cosine-weighted hemisphere sampling)
+                float3 scatterDirection = hit.normal + PCGRandomDirection(seed);
 
                 // Handle the degenerate case where the scatter direction is near zero
                 if (any(abs(scatterDirection) < EPSILON))
@@ -394,14 +419,9 @@ Shader "RayTracer/RayShader"
                 }
             }
 
-            // Runs per vertex
-            VertexToFragment RayTracerVertexShader(appdata_base meshVertexData)
-            {
-                VertexToFragment vertexOutput;
-                vertexOutput.screenPosition = UnityObjectToClipPos(meshVertexData.vertex);
-                vertexOutput.pixelCoordinates = meshVertexData.texcoord;
-                return vertexOutput;
-            }
+            /*
+             * Ray-Geometry intersection
+             */
 
             RayHit RayHitsQuad(Ray ray, Interval rayInterval, Quad quad)
             {
@@ -501,6 +521,10 @@ Shader "RayTracer/RayShader"
                 return hit;
             }
 
+            /*
+             * Ray Tracing
+             */
+
             // Get the closest hit for a ray
             RayHit GetHit(Ray ray)
             {
@@ -561,14 +585,16 @@ Shader "RayTracer/RayShader"
                     // We hit something, so scatter the ray based on the material
                     RayScatter scatter = ScatterByMaterial(ray, hit, hit.material, seed);
 
-                    // If the material didn't scatter, it was absorbed so simply return black
+                    // If the material didn't scatter, it was absorbed so return any emission from the material
                     if (!scatter.didScatter) 
                     {
                         return scatter.emission * rayColour; // Return any emission from the material
                     }
 
-                    // Now we can alter the ray based on the effects of the material
+                    // Move to the scattered ray for the next bounce
                     ray = scatter.scatteredRay;
+                    
+                    // Apply attenuation from our material
                     rayColour *= scatter.attenuation;
 
                     // Add any emission from the material
@@ -619,8 +645,12 @@ Shader "RayTracer/RayShader"
                 return CreateRay(rayOrigin, rayDirection);
             }
 
+            /*
+             * Shader entry points
+             */
+
             // Runs per pixel
-            fixed4 RayTracerFragmentShader(VertexToFragment pixelData) : SV_Target
+            fixed4 RayFragmentShader(VertexToFragment pixelData) : SV_Target
             {
                 // Get pixel coordinates
                 uint2 pixelCoord = uint2(pixelData.pixelCoordinates * _ScreenParams.xy);
@@ -630,7 +660,7 @@ Shader "RayTracer/RayShader"
                 float3 camUp = CameraLocalToWorld._m01_m11_m21;
 
                 // Generate an RNG seed for this pixel
-                uint pixelSeed = pixelCoord.x * 73856093u ^ pixelCoord.y * 19349663u;
+                uint pixelSeed = pixelCoord.x * 73856093u ^ pixelCoord.y * 19349663u + FrameNumber * 834123;
 
                 // Start at black as if we have no intersections, light wouldn't be reflected to the camera
                 float3 pixelColour = float3(0, 0, 0);
@@ -639,7 +669,7 @@ Shader "RayTracer/RayShader"
                 for (int sample = 0; sample < SamplesPerPixel; sample++)
                 {
                     // Make a seed for this sample
-                    uint sampleSeed = pixelSeed + sample * 12345u;
+                    uint sampleSeed = pixelSeed + sample * 12345u + FrameNumber * 834123;
 
                     // Create the ray
                     Ray ray = GetRay(sampleSeed, camRight, camUp, pixelData);
@@ -653,6 +683,15 @@ Shader "RayTracer/RayShader"
                 pixelColour *= pixelSampleScale;
 
                 return fixed4(pixelColour, 1.0);
+            }
+
+            // Runs per vertex
+            VertexToFragment RayVertexShader(appdata_base meshVertexData)
+            {
+                VertexToFragment vertexOutput;
+                vertexOutput.screenPosition = UnityObjectToClipPos(meshVertexData.vertex);
+                vertexOutput.pixelCoordinates = meshVertexData.texcoord;
+                return vertexOutput;
             }
             ENDCG
         }
