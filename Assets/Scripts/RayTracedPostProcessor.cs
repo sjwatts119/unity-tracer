@@ -31,6 +31,8 @@ public class RayTracedPostProcessor : MonoBehaviour
     public static readonly int CameraFocalDistancePropertyID = Shader.PropertyToID("CameraFocalDistance");
     public static readonly int CameraPlaneWidthPropertyID = Shader.PropertyToID("CameraPlaneWidth");
     public static readonly int CameraPlaneHeightPropertyID = Shader.PropertyToID("CameraPlaneHeight");
+    public static readonly int CameraDefocusAnglePropertyID = Shader.PropertyToID("CameraDefocusAngle");
+    public static readonly int CameraLocalToWorldPropertyID = Shader.PropertyToID("CameraLocalToWorld");
     public static readonly int SamplesPerPixelPropertyID = Shader.PropertyToID("SamplesPerPixel");
     public static readonly int RayMaxDepthPropertyID = Shader.PropertyToID("RayMaxDepth");
 
@@ -55,11 +57,10 @@ public class RayTracedPostProcessor : MonoBehaviour
         
         // Populate camera data
         material.SetFloat(CameraFocalDistancePropertyID, cameraFocalDistance);
-        material.SetFloat("CameraDefocusAngle", cameraDefocusAngle);
+        material.SetFloat(CameraDefocusAnglePropertyID, cameraDefocusAngle);
         material.SetFloat(CameraPlaneWidthPropertyID, planeWidth);
         material.SetFloat(CameraPlaneHeightPropertyID, planeHeight);
-        material.SetMatrix("CameraLocalToWorld", camera.transform.localToWorldMatrix);
-        
+        material.SetMatrix(CameraLocalToWorldPropertyID, camera.transform.localToWorldMatrix);
     }
     
     void PopulateAntialiasingData(Material material)
