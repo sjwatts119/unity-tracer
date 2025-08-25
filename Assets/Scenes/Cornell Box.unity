@@ -270,13 +270,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   renderedFrames: 0
-  samplesPerPixel: 1
+  samplesPerPixel: 89
   rayMaxDepth: 100
   accumulateFrames: 1
   cameraFocalDistance: 10.8
   cameraDefocusAngle: 0
   accumulationShader: {fileID: 4800000, guid: 525c156c2d8b497299080b9f4951ba81, type: 3}
-  exportAtFrame: 250
+  exportAtFrame: 0
 --- !u!1 &374052898
 GameObject:
   m_ObjectHideFlags: 0
@@ -314,6 +314,7 @@ MonoBehaviour:
   fuzz: 0.5
   refractiveIndex: 1
   emission: {r: 0, g: 0, b: 0, a: 1}
+  emissionStrength: 0
 --- !u!135 &374052900
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -561,6 +562,7 @@ MonoBehaviour:
   fuzz: 0
   refractiveIndex: 1
   emission: {r: 0, g: 0, b: 0, a: 1}
+  emissionStrength: 0
 --- !u!64 &592022957
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -688,6 +690,7 @@ MonoBehaviour:
   fuzz: 0
   refractiveIndex: 1.45
   emission: {r: 0, g: 0, b: 0, a: 1}
+  emissionStrength: 0
 --- !u!135 &652891028
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -863,6 +866,7 @@ MonoBehaviour:
   fuzz: 0
   refractiveIndex: 1
   emission: {r: 0, g: 0, b: 0, a: 1}
+  emissionStrength: 0
 --- !u!65 &1277118373
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -989,6 +993,7 @@ MonoBehaviour:
   fuzz: 0
   refractiveIndex: 1
   emission: {r: 0, g: 0, b: 0, a: 1}
+  emissionStrength: 0
 --- !u!135 &1320208951
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -1115,6 +1120,7 @@ MonoBehaviour:
   fuzz: 0
   refractiveIndex: 1
   emission: {r: 0, g: 0, b: 0, a: 1}
+  emissionStrength: 0
 --- !u!64 &1370757451
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -1242,6 +1248,7 @@ MonoBehaviour:
   fuzz: 0
   refractiveIndex: 1
   emission: {r: 0, g: 0, b: 0, a: 1}
+  emissionStrength: 0
 --- !u!64 &1503469472
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -1369,6 +1376,7 @@ MonoBehaviour:
   fuzz: 0
   refractiveIndex: 1
   emission: {r: 0, g: 0, b: 0, a: 1}
+  emissionStrength: 0
 --- !u!65 &1772928798
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1495,6 +1503,7 @@ MonoBehaviour:
   fuzz: 0
   refractiveIndex: 1
   emission: {r: 0, g: 0, b: 0, a: 1}
+  emissionStrength: 0
 --- !u!64 &1868878630
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -1622,6 +1631,7 @@ MonoBehaviour:
   fuzz: 0
   refractiveIndex: 1
   emission: {r: 1, g: 0.99660856, b: 0.76792455, a: 1}
+  emissionStrength: 10
 --- !u!64 &1926110888
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -1749,6 +1759,7 @@ MonoBehaviour:
   fuzz: 0
   refractiveIndex: 1.515
   emission: {r: 0, g: 0, b: 0, a: 1}
+  emissionStrength: 0
 --- !u!135 &2051653971
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -1875,6 +1886,7 @@ MonoBehaviour:
   fuzz: 0
   refractiveIndex: 1
   emission: {r: 0, g: 0, b: 0, a: 1}
+  emissionStrength: 0
 --- !u!64 &2084130522
 MeshCollider:
   m_ObjectHideFlags: 0

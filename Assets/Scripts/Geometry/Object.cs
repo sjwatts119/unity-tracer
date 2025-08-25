@@ -23,12 +23,18 @@ namespace Geometry
         [Header("Emission Properties")]
         [SerializeField, ColorUsage(false)]
         private Color emission = Color.black;
+        
+        [Header("Emission Properties")]
+        [SerializeField, Range(0f, 30f)]
+        private float emissionStrength = 1f;
 
         public MaterialType MaterialType => materialType;
         public Color Albedo => albedo;
         public float Fuzz => fuzz;
         public float RefractiveIndex => refractiveIndex;
         public Color Emission => emission;
+        
+        public float EmissionStrength => emissionStrength;
         
         public abstract T[] ToShaderData();
         
@@ -40,7 +46,8 @@ namespace Geometry
                 albedo = new Vector3(albedo.r, albedo.g, albedo.b),
                 fuzz = fuzz,
                 refractiveIndex = refractiveIndex,
-                emission = new Vector3(emission.r, emission.g, emission.b)
+                emission = new Vector3(emission.r, emission.g, emission.b),
+                emissionStrength = emissionStrength
             };
         }
 
@@ -74,6 +81,7 @@ namespace Geometry
         private void ValidateLambertian()
         {
             emission = Color.black;
+            emissionStrength = 0f;
             fuzz = 0f;
             refractiveIndex = 1f;
             
@@ -88,6 +96,7 @@ namespace Geometry
         private void ValidateMetal()
         {
             emission = Color.black;
+            emissionStrength = 0f;
             refractiveIndex = 1f;
             
             albedo = new Color(
@@ -103,6 +112,7 @@ namespace Geometry
         private void ValidateDielectric()
         {
             emission = Color.black;
+            emissionStrength = 0f;
             fuzz = 0f;
             
             albedo = new Color(

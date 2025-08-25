@@ -14,6 +14,7 @@ namespace Core
             public float fuzz;
             public float refractiveIndex;
             public Vector3 emission;
+            public float emissionStrength;
         }
         
         [System.Serializable]

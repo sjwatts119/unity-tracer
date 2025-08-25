@@ -36,6 +36,7 @@ Shader "RayTracer/RayShader"
                 float fuzz;
                 float refractiveIndex;
                 float3 emission;
+                float emissionStrength;
             };
 
             struct Interval
@@ -321,7 +322,7 @@ Shader "RayTracer/RayShader"
                 // Build up the scatter info
                 scatter.scatteredRay = CreateRay(hit.position, normalize(scatterDirection));
                 scatter.attenuation = material.albedo;
-                scatter.emission = material.emission;
+                scatter.emission = float3 (0, 0, 0); // Lambertian surfaces
                 scatter.didScatter = true; // Lambertian always scatters
 
                 return scatter;
@@ -342,7 +343,7 @@ Shader "RayTracer/RayShader"
 
                 scatter.scatteredRay = CreateRay(hit.position, normalize(reflectDirection));
                 scatter.attenuation = material.albedo;
-                scatter.emission = material.emission;
+                scatter.emission = float3 (0, 0, 0);
 
                 // Our ray was scattered if the scattered direction is in the same hemisphere as the normal (it bounced off instead of being absorbed)
                 scatter.didScatter = dot(scatter.scatteredRay.direction, hit.normal) > 0;
@@ -381,7 +382,7 @@ Shader "RayTracer/RayShader"
                 // Populate the scatter info
                 scatter.scatteredRay = CreateRay(hit.position, normalize(direction));
                 scatter.attenuation = attenuation;
-                scatter.emission = material.emission;
+                scatter.emission = float3 (0, 0, 0);
                 scatter.didScatter = true; // Dielectric always scatters
                 return scatter;
             }
@@ -392,7 +393,7 @@ Shader "RayTracer/RayShader"
                 scatter.scatteredRay = ray; // Purely because this property needs to be set, it gets ignored when checking didScatter
                 scatter.didScatter = false; // We can consider this ray absorbed, its tracing terminates at the light source
                 scatter.attenuation = float3(0, 0, 0);
-                scatter.emission = material.emission;
+                scatter.emission = material.emission * material.emissionStrength;
                 return scatter;
             }
 
@@ -571,51 +572,55 @@ Shader "RayTracer/RayShader"
             fixed3 GetRayColour(Ray ray, inout uint seed)
             {
                 float3 rayColour = float3(1, 1, 1);
+                float3 accumulatedLight = float3(0, 0, 0); // Track accumulated light
                 
                 for (int depth = 0; depth < RayMaxDepth; depth++)
                 {
                     RayHit hit = GetHit(ray);
 
-                    // Did this ray hit anything?
+                   // Did this ray hit anything?
                     if (!hit.didHit)
                     {
-                        return float3(0, 0, 0); // Return black if we hit nothing
+                        // Sky gradient from white to light blue based on ray direction
+                        // float t = 0.5 * (ray.direction.y + 1.0); // Convert Y from [-1,1] to [0,1]
+                        // float3 skyColor = lerp(float3(1.0, 1.0, 1.0), float3(0.5, 0.7, 1.0), t);
+                        // return accumulatedLight + (skyColor * rayColour);
+                        return accumulatedLight * float3(0, 0, 0); // Black background
                     }
 
                     // We hit something, so scatter the ray based on the material
                     RayScatter scatter = ScatterByMaterial(ray, hit, hit.material, seed);
 
-                    // If the material didn't scatter, it was absorbed so return any emission from the material
+                    // Add emission from this surface, weighted by current ray color
+                    accumulatedLight += scatter.emission * rayColour;
+
+                    // If the material didn't scatter (like a light source), we're done
                     if (!scatter.didScatter) 
                     {
-                        return scatter.emission * rayColour; // Return any emission from the material
+                        return accumulatedLight;
                     }
 
                     // Move to the scattered ray for the next bounce
                     ray = scatter.scatteredRay;
-                    
+
                     // Apply attenuation from our material
                     rayColour *= scatter.attenuation;
-
-                    // Add any emission from the material
-                    rayColour += scatter.emission;
 
                     // Russian roulette termination to prevent spending resources on hardly contributing rays
                     if (depth < 3) continue; // Don't terminate the first few bounces
 
-                    // Don't terminate if the ray is still bright (over 10% in any channel)
+                    // Don't terminate if the ray is still bright (over 1% in any channel)
                     float maxComponent = max(rayColour.r, max(rayColour.g, rayColour.b));
-                    if (maxComponent > 0.1) continue;
+                    if (maxComponent > 0.01) continue;
 
                     // Survival probability is directly proportional to brightness
-                    // Dimmer rays are more likely to be terminated
                     if (PCGRandomFloat(seed) > maxComponent) break;
 
                     // Survived, so scale up the colour to maintain energy
                     rayColour /= maxComponent;
                 }
                 
-                return rayColour;
+                return accumulatedLight;
             }
 
             // Generate a ray from either the camera or a defocus disk and apply anti-aliasing jitter
