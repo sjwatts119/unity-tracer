@@ -485,9 +485,9 @@ Shader "RayTracer/RayShader"
                     // Now we can alter the ray based on the effects of the material
                     ray = scatter.scatteredRay;
                     rayColour *= scatter.attenuation;
-                    
-                    // TODO this is wrong, need to add a scale factor for emission and it should be additive, not multiplicative
-                    rayColour += scatter.emission * rayColour;
+
+                    // Add any emission from the material
+                    rayColour += scatter.emission;
 
                     // Russian roulette termination to prevent spending resources on hardly contributing rays
                     if (depth < 3) continue; // Don't terminate the first few bounces
