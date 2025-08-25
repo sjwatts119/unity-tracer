@@ -340,21 +340,37 @@ Shader "RayTracer/RayShader"
                 return scatter;
             }
 
+            RayScatter ScatterLight(Ray ray, RayHit hit, Material material, inout uint seed)
+            {
+                RayScatter scatter;
+                scatter.scatteredRay = ray; // Purely because this property needs to be set, it gets ignored when checking didScatter
+                scatter.didScatter = false; // We can consider this ray absorbed, its tracing terminates at the light source
+                scatter.attenuation = float3(0, 0, 0);
+                scatter.emission = material.emission;
+                return scatter;
+            }
+
             // Get a scatter object based on the material type
             RayScatter ScatterByMaterial(Ray ray, RayHit hit, Material material, inout uint seed)
             {
-                if (material.type == MATERIAL_METAL)
+                switch (material.type)
                 {
-                    return ScatterMetal(ray, hit, material, seed);
-                } else if (material.type == MATERIAL_LAMBERTIAN)
-                {
-                    return ScatterLambertian(ray, hit, material, seed);
-                } else if (material.type == MATERIAL_DIELECTRIC)
-                {
-                    return ScatterDielectric(ray, hit, material, seed);
-                } 
-
-                return ScatterLambertian(ray, hit, material, seed); // Default to Lambertian if for some reason we get an unknown material
+                    case MATERIAL_LAMBERTIAN:
+                        return ScatterLambertian(ray, hit, material, seed);
+                    case MATERIAL_METAL:
+                        return ScatterMetal(ray, hit, material, seed);
+                    case MATERIAL_DIELECTRIC:
+                        return ScatterDielectric(ray, hit, material, seed);
+                    case MATERIAL_LIGHT:
+                        return ScatterLight(ray, hit, material, seed);
+                    default:
+                        RayScatter noScatter;
+                        noScatter.scatteredRay = ray; // Purely because this property needs to be set, it gets ignored when checking didScatter
+                        noScatter.didScatter = false; // Unknown material, so we consider the ray absorbed
+                        noScatter.attenuation = float3(0, 0, 0);
+                        noScatter.emission = float3(0, 0, 0);
+                        return noScatter;
+                }
             }
 
             // Runs per vertex
@@ -408,7 +424,7 @@ Shader "RayTracer/RayShader"
                 // We have a valid intersection within the ray interval, so populate the hit info
                 hit.didHit = true;
                 hit.t = root;
-                hit.position = RayAt(ray, root).origin;
+                hit.position = ray.origin + hit.t * ray.direction;
                 hit.material = sphere.material;
                 float3 outwardNormal = (hit.position - sphere.centre) / sphere.radius;
                 hit = RayHitSetFaceNormal(hit, ray, outwardNormal);
@@ -454,11 +470,7 @@ Shader "RayTracer/RayShader"
                     // Did this ray hit anything?
                     if (!hit.didHit)
                     {
-                        float3 backgroundGradient = lerp(float3(1.0, 1.0, 1.0), float3(0.8, 0.1, 0.5), 0.5 * (normalize(ray.direction).y + 1.0));
-                        
-                        // If we hit nothing, so simply return our calculated colour so far attenuated by our background gradient
-                        rayColour *= backgroundGradient;
-                        break;
+                        return float3(0, 0, 0); // Return black if we hit nothing
                     }
 
                     // We hit something, so scatter the ray based on the material
@@ -467,8 +479,7 @@ Shader "RayTracer/RayShader"
                     // If the material didn't scatter, it was absorbed so simply return black
                     if (!scatter.didScatter) 
                     {
-                        rayColour = float3(0, 0, 0);
-                        break;
+                        return scatter.emission * rayColour; // Return any emission from the material
                     }
 
                     // Now we can alter the ray based on the effects of the material
@@ -476,7 +487,7 @@ Shader "RayTracer/RayShader"
                     rayColour *= scatter.attenuation;
                     
                     // TODO this is wrong, need to add a scale factor for emission and it should be additive, not multiplicative
-                    // rayColour += scatter.emission * rayColour;
+                    rayColour += scatter.emission * rayColour;
 
                     // Russian roulette termination to prevent spending resources on hardly contributing rays
                     if (depth < 3) continue; // Don't terminate the first few bounces
