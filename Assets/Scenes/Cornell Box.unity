@@ -180,7 +180,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
-  field of view: 60
+  field of view: 30
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -207,7 +207,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 15, z: 0}
+  m_LocalPosition: {x: 0, y: 15, z: -8.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -270,12 +270,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   renderedFrames: 0
-  samplesPerPixel: 50
-  rayMaxDepth: 20
+  samplesPerPixel: 1
+  rayMaxDepth: 100
   accumulateFrames: 1
   cameraFocalDistance: 10.8
   cameraDefocusAngle: 0
   accumulationShader: {fileID: 4800000, guid: 525c156c2d8b497299080b9f4951ba81, type: 3}
+  exportAtFrame: 250
 --- !u!1 &374052898
 GameObject:
   m_ObjectHideFlags: 0
@@ -310,7 +311,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   materialType: 1
   albedo: {r: 1, g: 1, b: 1, a: 1}
-  fuzz: 0
+  fuzz: 0.5
   refractiveIndex: 1
   emission: {r: 0, g: 0, b: 0, a: 1}
 --- !u!135 &374052900
@@ -1746,7 +1747,7 @@ MonoBehaviour:
   materialType: 2
   albedo: {r: 1, g: 1, b: 1, a: 1}
   fuzz: 0
-  refractiveIndex: 1.45
+  refractiveIndex: 1.515
   emission: {r: 0, g: 0, b: 0, a: 1}
 --- !u!135 &2051653971
 SphereCollider:

@@ -31,6 +31,9 @@ public class RayTracedPostProcessor : MonoBehaviour
 
     [Header("Accumulation")]
     [SerializeField] private Shader accumulationShader;
+
+    [Header("Export Render")] 
+    [SerializeField] private int exportAtFrame;
     
     private ComputeBuffer _sphereBuffer;
     private ComputeBuffer _quadBuffer;
@@ -110,6 +113,11 @@ public class RayTracedPostProcessor : MonoBehaviour
         RenderTexture.ReleaseTemporary(currentFrame);
         RenderTexture.ReleaseTemporary(prevFrameCopy);
 
+        if (exportAtFrame > 0 && renderedFrames == exportAtFrame)
+        {
+            Export();
+        }
+
         renderedFrames += Application.isPlaying ? 1 : 0;
     }
 
@@ -164,6 +172,19 @@ public class RayTracedPostProcessor : MonoBehaviour
             _accumulatedTexture.enableRandomWrite = true;
             _accumulatedTexture.Create();
         }
+    }
+    
+    /*
+     * Exporting renders
+     */
+
+    private void Export()
+    {
+        string directoryName = "Renders";
+        string fileName = "Render_" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + ".png";
+        string fullPath = Application.dataPath + "/" + directoryName + "/" + fileName;
+        
+        ScreenCapture.CaptureScreenshot(fullPath);
     }
 
     /*
