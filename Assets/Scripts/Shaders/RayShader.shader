@@ -118,8 +118,10 @@ Shader "RayTracer/RayShader"
 
             // Camera
             float CameraFocalDistance;
+            float CameraDefocusAngle;
             float CameraPlaneWidth;
             float CameraPlaneHeight;
+            float4x4 CameraLocalToWorld;
             
             // Anti-aliasing
             int SamplesPerPixel;
@@ -175,19 +177,31 @@ Shader "RayTracer/RayShader"
                 return float3(PCGRandomFloatInRange(state, min, max), PCGRandomFloatInRange(state, min, max), PCGRandomFloatInRange(state, min, max));
             }
 
-            // Generate a random unit vector using the Marsaglia method
-            float3 PCGRandomUnitVector(inout uint state)
-            {
+            // Generate a random unit vector inside a unit sphere with the Marsaglia method
+            float2 PCGMarsagliaUnitCircle(inout uint state) {
                 float u1, u2, s;
-
+                
                 do {
                     u1 = PCGRandomFloatInRange(state, -1.0, 1.0);
                     u2 = PCGRandomFloatInRange(state, -1.0, 1.0);
                     s = u1 * u1 + u2 * u2;
                 } while (s >= 1.0 || s == 0.0);
+                
+                return float2(u1, u2);
+            }
 
+            float3 PCGRandomUnitVector(inout uint state) {
+                float2 p = PCGMarsagliaUnitCircle(state);
+                float s = p.x * p.x + p.y * p.y;
+                
                 float factor = 2.0 * sqrt(1.0 - s);
-                return float3(u1 * factor, u2 * factor, 1.0 - 2.0 * s);
+                return float3(p.x * factor, p.y * factor, 1.0 - 2.0 * s);
+            }
+
+            // Generate a random unit vector using the Marsaglia method
+            float3 PCGRandomUnitVectorInUnitDisk(inout uint state) {
+                float2 p = PCGMarsagliaUnitCircle(state);
+                return float3(p.x, p.y, 0.0);
             }
 
             float3 PCGRandomUnitVectorOnHemisphere(float3 normal, inout uint state)
@@ -200,7 +214,6 @@ Shader "RayTracer/RayShader"
                 else
                     return -inUnitSphere;
             }
-
             // Get a point along the ray at distance t from the origin
             Ray RayAt(Ray ray, float t)
             {
@@ -402,25 +415,6 @@ Shader "RayTracer/RayShader"
                 return hit;
             }
 
-            // Get a ray for anti-aliasing sampling
-            Ray GetRay(float2 uv, float2 offset)
-            {
-                // Convert UV coordinates (0-1) to image plane coordinates with offset
-                float2 offsetUV = uv + offset / float2(_ScreenParams.x, _ScreenParams.y);
-                float2 imagePlanePosition = (offsetUV - 0.5) * float2(CameraPlaneWidth, CameraPlaneHeight);
-
-                // Ray direction in camera space
-                float3 cameraRayDirection = normalize(float3(imagePlanePosition.x, imagePlanePosition.y, CameraFocalDistance));
-
-                // Transform ray direction to world space
-                float3 rayDirection = normalize(mul((float3x3)unity_CameraToWorld, cameraRayDirection));
-
-                // Ray origin is from the camera position in world space for now (subject to change for depth of field)
-                float3 rayOrigin = _WorldSpaceCameraPos;
-
-                return CreateRay(rayOrigin, rayDirection);
-            }
-
             // Get the closest hit for a ray
             RayHit GetHit(Ray ray)
             {
@@ -502,11 +496,42 @@ Shader "RayTracer/RayShader"
                 return rayColour;
             }
 
+            // Generate a ray from either the camera or a defocus disk and apply anti-aliasing jitter
+            Ray GetRay(inout uint sampleSeed, float3 camRight, float3 camUp, VertexToFragment pixelData)
+            {
+                // Our ray starts at the camera position
+                float3 rayOrigin = _WorldSpaceCameraPos;
+
+                // If we have defocus enabled, jitter the ray origin within a disk perpendicular to the view direction
+                if (CameraDefocusAngle > 0.0)
+                {
+                    float2 defocusJitter = PCGRandomUnitVectorInUnitDisk(sampleSeed) * CameraDefocusAngle * (CameraFocalDistance / _ScreenParams.xy);
+                    rayOrigin += (camRight * defocusJitter.x) + (camUp * defocusJitter.y);
+                }
+
+                // Apply anti-aliasing jitter within the pixel
+                float2 antialiasingJitter = PCGSampleSquare(sampleSeed) / _ScreenParams.xy;
+                float2 jitteredCoord = pixelData.pixelCoordinates + antialiasingJitter;
+
+                // Calculate the jittered focus point in local camera space, then transform to world space
+                float3 jitteredFocusPointLocal = float3(jitteredCoord - 0.5, 1) * float3(CameraPlaneWidth, CameraPlaneHeight, CameraFocalDistance);
+                float3 jitteredFocusPoint = mul(CameraLocalToWorld, float4(jitteredFocusPointLocal, 1));
+
+                // Calculate ray direction from origin to jittered focus point
+                float3 rayDirection = normalize(jitteredFocusPoint - rayOrigin);
+
+                return CreateRay(rayOrigin, rayDirection);
+            }
+
             // Runs per pixel
             fixed4 RayTracerFragmentShader(VertexToFragment pixelData) : SV_Target
             {
                 // Get pixel coordinates
                 uint2 pixelCoord = uint2(pixelData.pixelCoordinates * _ScreenParams.xy);
+
+                // Get camera basis vectors from the local to world matrix (Thanks to https://github.com/SebLague for this strategy)
+                float3 camRight = CameraLocalToWorld._m00_m10_m20;
+                float3 camUp = CameraLocalToWorld._m01_m11_m21;
 
                 // Generate an RNG seed for this pixel
                 uint pixelSeed = pixelCoord.x * 73856093u ^ pixelCoord.y * 19349663u;
@@ -519,12 +544,9 @@ Shader "RayTracer/RayShader"
                 {
                     // Make a seed for this sample
                     uint sampleSeed = pixelSeed + sample * 12345u;
-                    
-                    // Generate random offset for this sample
-                    float2 offset = PCGSampleSquare(sampleSeed);
-                    
-                    // Get ray with random offset
-                    Ray ray = GetRay(pixelData.pixelCoordinates, offset);
+
+                    // Create the ray
+                    Ray ray = GetRay(sampleSeed, camRight, camUp, pixelData);
                     
                     // Accumulate colour
                     pixelColour += GetRayColour(ray, sampleSeed);

@@ -16,6 +16,14 @@ public class RayTracedPostProcessor : MonoBehaviour
     [Range(1, 250)]
     public int rayMaxDepth;
     
+    [Header("Camera")]
+    [Range(0.1f, 50f)]
+    public float cameraFocalDistance = 1.0f;
+    
+    [Header("Camera")]
+    [Range(0.0f, 100f)]
+    public float cameraDefocusAngle = 10f;
+    
     private ComputeBuffer _sphereBuffer;
     
     public static readonly int SphereBufferPropertyID = Shader.PropertyToID("SphereBuffer");
@@ -24,12 +32,7 @@ public class RayTracedPostProcessor : MonoBehaviour
     public static readonly int CameraPlaneWidthPropertyID = Shader.PropertyToID("CameraPlaneWidth");
     public static readonly int CameraPlaneHeightPropertyID = Shader.PropertyToID("CameraPlaneHeight");
     public static readonly int SamplesPerPixelPropertyID = Shader.PropertyToID("SamplesPerPixel");
-    public static readonly int PixelDeltaUPropertyID = Shader.PropertyToID("PixelDeltaU");
-    public static readonly int PixelDeltaVPropertyID = Shader.PropertyToID("PixelDeltaV");
-    public static readonly int Pixel00LocPropertyID = Shader.PropertyToID("Pixel00Loc");
     public static readonly int RayMaxDepthPropertyID = Shader.PropertyToID("RayMaxDepth");
-
-    
 
     // Called after all rendering is complete to render image
     public void OnRenderImage(RenderTexture source, RenderTexture destination)
@@ -46,27 +49,17 @@ public class RayTracedPostProcessor : MonoBehaviour
     
     void PopulateCameraData(Material material, Camera camera)
     {
-        float focalDistance = 1.0f;
-        
         // Calculate the dimensions of the camera's near plane
-        float planeHeight = 2.0f * focalDistance * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        float planeHeight = 2.0f * cameraFocalDistance * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
         float planeWidth = planeHeight * camera.aspect;
         
-        // Calculate pixel spacing vectors for antialiasing
-        Vector3 pixelDeltaU = new Vector3(planeWidth / Screen.width, 0, 0);
-        Vector3 pixelDeltaV = new Vector3(0, -planeHeight / Screen.height, 0); // Negative because screen Y is flipped
-        
-        // Calculate the location of pixel (0,0) in world space relative to camera
-        Vector3 viewportUpperLeft = new Vector3(-planeWidth * 0.5f, planeHeight * 0.5f, focalDistance);
-        Vector3 pixel00Loc = viewportUpperLeft + 0.5f * (pixelDeltaU + pixelDeltaV);
-        
         // Populate camera data
-        material.SetFloat(CameraFocalDistancePropertyID, focalDistance);
+        material.SetFloat(CameraFocalDistancePropertyID, cameraFocalDistance);
+        material.SetFloat("CameraDefocusAngle", cameraDefocusAngle);
         material.SetFloat(CameraPlaneWidthPropertyID, planeWidth);
         material.SetFloat(CameraPlaneHeightPropertyID, planeHeight);
-        material.SetVector(PixelDeltaUPropertyID, pixelDeltaU);
-        material.SetVector(PixelDeltaVPropertyID, pixelDeltaV);
-        material.SetVector(Pixel00LocPropertyID, pixel00Loc);
+        material.SetMatrix("CameraLocalToWorld", camera.transform.localToWorldMatrix);
+        
     }
     
     void PopulateAntialiasingData(Material material)
