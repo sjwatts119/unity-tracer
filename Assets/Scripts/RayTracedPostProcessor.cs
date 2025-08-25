@@ -62,14 +62,14 @@ public class RayTracedPostProcessor : MonoBehaviour
     {
         var rayMaterial = RayShader.Material;
         
-        // Populate shader data from scene and settings
         PopulateAntialiasingData(rayMaterial);
         PopulateRaytracingData(rayMaterial);
         PopulateSphereData(rayMaterial);
         PopulateQuadData(rayMaterial);
         PopulateCameraData(rayMaterial, GetComponent<Camera>());
         PopulateRenderingData(rayMaterial);
-
+        
+        // If we are not accumulating frames, just render the current frame
         if (!accumulateFrames)
         {
             renderedFrames = 0;
@@ -77,14 +77,16 @@ public class RayTracedPostProcessor : MonoBehaviour
             return;
         }
 
-        InitialiseAccumulation();
-        CreateAccumulationTexture(source.width, source.height);
+        InitFrame(source);
+        
+        // Populate shader data from scene and settings
 
         // Create temporary copy of the previous accumulated frame
         RenderTexture prevFrameCopy = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGBFloat);
         Graphics.Blit(_accumulatedTexture, prevFrameCopy);
 
         // Render the current frame with ray tracing
+        rayMaterial.SetInt(FrameNumberPropertyID, renderedFrames);
         RenderTexture currentFrame = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGBFloat);
         Graphics.Blit(source, currentFrame, rayMaterial);
 
@@ -101,14 +103,20 @@ public class RayTracedPostProcessor : MonoBehaviour
             Graphics.Blit(currentFrame, _accumulatedTexture);
         }
 
-        // Present the accumulated result to screen
+        // Draw the accumulated result to screen
         Graphics.Blit(_accumulatedTexture, destination);
 
         // Clean up temporary textures
         RenderTexture.ReleaseTemporary(currentFrame);
         RenderTexture.ReleaseTemporary(prevFrameCopy);
 
-        renderedFrames++;
+        renderedFrames += Application.isPlaying ? 1 : 0;
+    }
+
+    void InitFrame(RenderTexture source)
+    {
+        InitialiseAccumulation();
+        CreateAccumulationTexture(source.width, source.height);
     }
 
     void OnDisable()
