@@ -27,6 +27,15 @@ Shader "RayTracer/RayShader"
              * Structs
              */
 
+            struct Material
+            {
+                int type;
+                float3 albedo;
+                float fuzz;
+                float refractiveIndex;
+                float3 emission;
+            };
+
             struct Interval
             {
                 float min;
@@ -46,6 +55,7 @@ Shader "RayTracer/RayShader"
                 float3 normal;
                 float t;
                 bool frontFace;
+                Material material;
             };
 
             struct RayScatter
@@ -56,19 +66,11 @@ Shader "RayTracer/RayShader"
                 bool didScatter;
             };
 
-            struct Material
-            {
-                int type;
-                float3 albedo; // For Lambertian and Metal
-                float fuzz;    // For Metal
-                float refractiveIndex; // For Glass
-                float3 emission; // For Light
-            };
-
             struct Sphere
             {
                 float3 centre;
                 float radius;
+                Material material;
             };
 
             struct VertexToFragment
@@ -89,11 +91,12 @@ Shader "RayTracer/RayShader"
                 return ray;
             }
 
-            Sphere CreateSphere(float3 centre, float radius)
+            Sphere CreateSphere(float3 centre, float radius, Material material)
             {
                 Sphere sphere;
                 sphere.centre = centre;
                 sphere.radius = radius;
+                sphere.material = material;
                 return sphere;
             }
 
@@ -342,6 +345,7 @@ Shader "RayTracer/RayShader"
                 hit.didHit = true;
                 hit.t = root;
                 hit.position = RayAt(ray, root).origin;
+                hit.material = sphere.material;
                 float3 outwardNormal = (hit.position - sphere.centre) / sphere.radius;
                 hit = RayHitSetFaceNormal(hit, ray, outwardNormal);
                 return hit;
@@ -412,27 +416,8 @@ Shader "RayTracer/RayShader"
                         break;
                     }
 
-                    // We hit something, so scatter the ray and attenuate the colour by 0.5 (50% energy loss per bounce)
-                    // ray.origin = hit.position;
-                    // ray.direction = PCGRandomUnitVectorOnHemisphere(hit.normal, seed);
-                    // rayColour *= 0.5;
-
-                    // Set up a test lambertian material object
-                    Material testLambertian;
-                    testLambertian.type = MATERIAL_LAMBERTIAN;
-                    testLambertian.albedo = float3(0.8, 0.3, 0.3); // Red albedo
-                    testLambertian.emission = float3(0, 0, 0); // No emission
-                    testLambertian.fuzz = 0.0;
-                    testLambertian.refractiveIndex = 1.0;
-
-                    Material testMetal;
-                    testMetal.type = MATERIAL_METAL;
-                    testMetal.albedo = float3(0.8, 0.8, 0.8); // Grey albedo
-                    testMetal.emission = float3(0 , 0, 0); // No emission
-                    testMetal.fuzz = 0.0;
-                    testMetal.refractiveIndex = 1.0;
-                    
-                    RayScatter scatter = ScatterByMaterial(ray, hit, testLambertian, seed);
+                    // We hit something, so scatter the ray based on the material
+                    RayScatter scatter = ScatterByMaterial(ray, hit, hit.material, seed);
 
                     // If the material didn't scatter, it was absorbed so simply return black
                     if (!scatter.didScatter) 
@@ -444,14 +429,16 @@ Shader "RayTracer/RayShader"
                     // Now we can alter the ray based on the effects of the material
                     ray = scatter.scatteredRay;
                     rayColour *= scatter.attenuation;
-                    rayColour += scatter.emission * rayColour;
+                    
+                    // TODO this is wrong, need to add a scale factor for emission and it should be additive, not multiplicative
+                    // rayColour += scatter.emission * rayColour;
 
                     // Russian roulette termination to prevent spending resources on hardly contributing rays
                     if (depth < 3) continue; // Don't terminate the first few bounces
 
                     // Don't terminate if the ray is still bright (over 10% in any channel)
                     float maxComponent = max(rayColour.r, max(rayColour.g, rayColour.b));
-                    if ( maxComponent > 0.1) continue;
+                    if (maxComponent > 0.1) continue;
 
                     // Survival probability is directly proportional to brightness
                     // Dimmer rays are more likely to be terminated
