@@ -60,16 +60,24 @@ Shader "RayTracer/RayShader"
 
             struct RayScatter
             {
+                bool didScatter;
                 Ray scatteredRay;
                 float3 attenuation;
                 float3 emission;
-                bool didScatter;
             };
 
             struct Sphere
             {
                 float3 centre;
                 float radius;
+                Material material;
+            };
+
+            struct Quad
+            {
+                float3 q;
+                float3 u;
+                float3 v;
                 Material material;
             };
 
@@ -115,6 +123,10 @@ Shader "RayTracer/RayShader"
             // Sphere
             StructuredBuffer<Sphere> SphereBuffer;
             int SphereCount;
+
+            // Quad
+            StructuredBuffer<Quad> QuadBuffer;
+            int QuadCount;
 
             // Camera
             float CameraFocalDistance;
@@ -235,6 +247,7 @@ Shader "RayTracer/RayShader"
                 return interval.min < value && value < interval.max;
             }
 
+            // Set the normal and front face of a ray hit based on the ray direction and outward normal
             RayHit RayHitSetFaceNormal(RayHit hitRecord, Ray ray, float3 outwardNormal)
             {
                 hitRecord.frontFace = dot(ray.direction, outwardNormal) < 0;
@@ -248,6 +261,14 @@ Shader "RayTracer/RayShader"
                 float r0 = (1.0 - refractiveIndex) / (1.0 + refractiveIndex);
                 r0 = r0 * r0;
                 return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
+            }
+
+            // Check if a point defined by (a, b) is inside the quad defined by the origin, u, and v vectors
+            bool IsInteriorToQuad(Quad quad, float a, float b)
+            {
+                Interval unitInterval = CreateInterval(0.0, 1.0);
+
+                return IntervalContains(unitInterval, a) && IntervalContains(unitInterval, b);
             }
 
             /*
@@ -381,6 +402,55 @@ Shader "RayTracer/RayShader"
                 vertexOutput.pixelCoordinates = meshVertexData.texcoord;
                 return vertexOutput;
             }
+
+            RayHit RayHitsQuad(Ray ray, Interval rayInterval, Quad quad)
+            {
+                // Calculate the plane normal and D constant for the quad plane
+                float3 normal = normalize(cross(quad.u, quad.v));
+                float D = dot(normal, quad.q);
+                float denom = dot(normal, ray.direction);
+
+                // Initialsze hit info with hit set to false for now
+                RayHit hit = (RayHit)0;
+
+                if (abs(denom) < EPSILON)
+                {
+                    return hit; // Ray is parallel to the quad plane, so no intersection
+                }
+
+                // Calculate the intersection distance t along the ray
+                float t = (D - dot(normal, ray.origin)) / denom;
+                
+                // Check if the intersection is within the ray interval
+                if (!IntervalContains(rayInterval, t))
+                {
+                    return hit; // Intersection is outside the ray interval
+                }
+
+                // Calculate the hit point
+                float3 hitPoint = ray.origin + t * ray.direction;
+                float3 planarHitpoint = hitPoint - quad.q;
+
+                // Calculate barycentric coordinates (alpha, beta) for the hit point
+                float barycentricDenom = dot(cross(quad.u, quad.v), cross(quad.u, quad.v));
+                float alpha = dot(cross(planarHitpoint, quad.v), cross(quad.u, quad.v)) / barycentricDenom;
+                float beta = dot(cross(quad.u, planarHitpoint), cross(quad.u, quad.v)) / barycentricDenom;
+
+                // Check if the hit point is inside the quad bounds
+                if (!IsInteriorToQuad(quad, alpha, beta))
+                {
+                    return hit; // Intersection is outside the quad bounds
+                }
+
+                // We have a valid intersection, so populate the hit info
+                hit.didHit = true;
+                hit.t = t;
+                hit.position = hitPoint;
+                hit.material = quad.material;
+                hit = RayHitSetFaceNormal(hit, ray, normal);
+
+                return hit;
+            }
             
             RayHit RayHitsSphere(Ray ray, Interval rayInterval, Sphere sphere)
             {
@@ -445,6 +515,21 @@ Shader "RayTracer/RayShader"
 
                     // Check for intersection with the sphere
                     RayHit hit = RayHitsSphere(ray, CreateInterval(EPSILON, closestHit.t), sphere);
+
+                    // If we have a hit and it's closer than our current closest hit, update closest hit
+                    if (hit.didHit && hit.t < closestHit.t)
+                    {
+                        closestHit = hit;
+                    }
+                }
+
+                // Iterate over all quads to find the closest hit
+                for (int i = 0; i < QuadCount; i++)
+                {
+                    Quad quad = QuadBuffer[i];
+
+                    // Check for intersection with the quad
+                    RayHit hit = RayHitsQuad(ray, CreateInterval(EPSILON, closestHit.t), quad);
 
                     // If we have a hit and it's closer than our current closest hit, update closest hit
                     if (hit.didHit && hit.t < closestHit.t)

@@ -1,33 +1,39 @@
 using System;
+using System.Collections.Generic;
 using Core;
 using Geometry;
+using NUnit.Framework;
+using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.Internal;
+using Plane = Geometry.Plane;
 
 
 [ExecuteAlways, ImageEffectAllowedInSceneView]
 public class RayTracedPostProcessor : MonoBehaviour
 {
     [Header("Anti-Aliasing")]
-    [Range(1, 250)]
+    [UnityEngine.Range(1, 250)]
     public int samplesPerPixel;
     
     [Header("Ray Tracing")]
-    [Range(1, 250)]
+    [UnityEngine.Range(1, 250)]
     public int rayMaxDepth;
     
     [Header("Camera")]
-    [Range(0.1f, 50f)]
+    [UnityEngine.Range(0.1f, 50f)]
     public float cameraFocalDistance = 1.0f;
     
     [Header("Camera")]
-    [Range(0.0f, 100f)]
+    [UnityEngine.Range(0.0f, 100f)]
     public float cameraDefocusAngle = 10f;
     
     private ComputeBuffer _sphereBuffer;
+    private ComputeBuffer _quadBuffer;
     
     public static readonly int SphereBufferPropertyID = Shader.PropertyToID("SphereBuffer");
     public static readonly int SphereCountPropertyID = Shader.PropertyToID("SphereCount");
+    public static readonly int QuadBufferPropertyID = Shader.PropertyToID("QuadBuffer");
+    public static readonly int QuadCountPropertyID = Shader.PropertyToID("QuadCount");
     public static readonly int CameraFocalDistancePropertyID = Shader.PropertyToID("CameraFocalDistance");
     public static readonly int CameraPlaneWidthPropertyID = Shader.PropertyToID("CameraPlaneWidth");
     public static readonly int CameraPlaneHeightPropertyID = Shader.PropertyToID("CameraPlaneHeight");
@@ -44,6 +50,7 @@ public class RayTracedPostProcessor : MonoBehaviour
         PopulateAntialiasingData(material);
         PopulateRaytracingData(material);
         PopulateSphereData(material);
+        PopulateQuadData(material);
         PopulateCameraData(material, GetComponent<Camera>());
         
         Graphics.Blit(source, destination, material);
@@ -102,7 +109,57 @@ public class RayTracedPostProcessor : MonoBehaviour
         material.SetInt(SphereCountPropertyID, sphereData.Length);
     }
 
+// Replace the PopulateQuadData method in your RayTracedPostProcessor class
+    void PopulateQuadData(Material material)
+    {
+        // Find both quads and planes
+        var quads = FindObjectsByType<Quad>(FindObjectsSortMode.None);
+        var planes = FindObjectsByType<Plane>(FindObjectsSortMode.None);
+    
+        _quadBuffer?.Release();
+        _quadBuffer = null;
+    
+        int totalCount = quads.Length + planes.Length;
+    
+        if (totalCount == 0)
+        {
+            material.SetInt(QuadCountPropertyID, 0);
+            return;
+        }
+    
+        var quadData = new ShaderStructs.Quad[totalCount];
+        int index = 0;
+    
+        for (int i = 0; i < quads.Length; i++)
+        {
+            quadData[index++] = quads[i].ToShaderData();
+        }
+    
+        // Add all planes to the buffer
+        for (int i = 0; i < planes.Length; i++)
+        {
+            quadData[index++] = planes[i].ToShaderData();
+        }
+    
+        // Populate the compute buffer with combined quad/plane data
+        _quadBuffer = new ComputeBuffer(quadData.Length, System.Runtime.InteropServices.Marshal.SizeOf<ShaderStructs.Quad>());
+        _quadBuffer.SetData(quadData);
+    
+        // Bind the buffer and count to the shader
+        material.SetBuffer(QuadBufferPropertyID, _quadBuffer);
+        material.SetInt(QuadCountPropertyID, quadData.Length);
+    }
+
     // Release the compute buffer when disabled or destroyed
-    void OnDisable() => _sphereBuffer?.Release();
-    void OnDestroy() => _sphereBuffer?.Release();
+    void OnDisable()
+    {
+        _sphereBuffer?.Release();
+        _quadBuffer?.Release();
+    }
+
+    void OnDestroy()
+    {
+        _sphereBuffer?.Release();
+        _quadBuffer?.Release();
+    }
 }

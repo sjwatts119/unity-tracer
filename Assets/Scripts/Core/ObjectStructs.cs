@@ -1,5 +1,6 @@
-﻿using Geometry;
-using UnityEngine;
+﻿using System.Numerics;
+using Geometry;
+using Vector3 = UnityEngine.Vector3;
 
 namespace Core
 {
@@ -20,6 +21,15 @@ namespace Core
         {
             public Vector3 centre;
             public float radius;
+            public Material material { get; set; }
+        }
+
+        [System.Serializable]
+        public struct Quad : HasMaterial
+        {
+            public Vector3 q; // Bottom-left corner
+            public Vector3 u; // Edge vector along the width ( q ---u--- )
+            public Vector3 v; // Edge vector along the height (rotate above example 90 degrees)
             public Material material { get; set; }
         }
     }
