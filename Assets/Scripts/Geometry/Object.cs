@@ -9,7 +9,7 @@ namespace Geometry
         [SerializeField] private MaterialType materialType = MaterialType.Lambertian;
         
         [Header("Base Properties")]
-        [SerializeField, ColorUsage(false, true)]
+        [SerializeField, ColorUsage(false)]
         private Color albedo = Color.white;
         
         [Header("Metal Properties")]
@@ -21,7 +21,7 @@ namespace Geometry
         private float refractiveIndex = 1.5f;
         
         [Header("Emission Properties")]
-        [SerializeField, ColorUsage(false, true)]
+        [SerializeField, ColorUsage(false)]
         private Color emission = Color.black;
 
         public MaterialType MaterialType => materialType;

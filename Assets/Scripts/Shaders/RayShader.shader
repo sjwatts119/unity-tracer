@@ -254,7 +254,7 @@ Shader "RayTracer/RayShader"
                 // Build up the scatter info
                 scatter.scatteredRay = CreateRay(hit.position, normalize(scatterDirection));
                 scatter.attenuation = material.albedo;
-                scatter.emission = float3(0, 0, 0); // Lambertian does not emit light
+                scatter.emission = material.emission;
                 scatter.didScatter = true; // Lambertian always scatters
 
                 return scatter;
@@ -268,16 +268,17 @@ Shader "RayTracer/RayShader"
                 // Reflect the ray direction around the normal
                 float3 reflectDirection = reflect(ray.direction, hit.normal);
 
-                // Add fuzziness if the material has fuzz
-                // if (material.fuzz > 0.0)
-                // {
-                //     
-                // }
+                if (material.fuzz > 0.0)
+                {
+                    reflectDirection = normalize(reflectDirection) + (PCGRandomUnitVector(seed) * material.fuzz);
+                }
 
                 scatter.scatteredRay = CreateRay(hit.position, normalize(reflectDirection));
                 scatter.attenuation = material.albedo;
-                scatter.emission = float3(0, 0, 0); // Metal does not emit light
-                scatter.didScatter = true; // Metal always scatters for now (subject to change with fuzz)
+                scatter.emission = material.emission;
+
+                // Our ray was scattered if the scattered direction is in the same hemisphere as the normal (it bounced off instead of being absorbed)
+                scatter.didScatter = dot(scatter.scatteredRay.direction, hit.normal) > 0;
 
                 return scatter;
             }
@@ -287,10 +288,13 @@ Shader "RayTracer/RayShader"
             {
                 if (material.type == MATERIAL_METAL)
                 {
-                    return ScatterMetal(ray, hit, material, seed); // Placeholder
+                    return ScatterMetal(ray, hit, material, seed);
+                } else if (material.type == MATERIAL_LAMBERTIAN)
+                {
+                    return ScatterLambertian(ray, hit, material, seed);
                 }
 
-                return ScatterLambertian(ray, hit, material, seed); // Default to Lambertian for now
+                return ScatterLambertian(ray, hit, material, seed); // Default to Lambertian if for some reason we get an unknown material
             }
 
             // Runs per vertex
