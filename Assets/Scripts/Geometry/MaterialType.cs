@@ -4,7 +4,7 @@
     {
         Lambertian = 0,
         Metal = 1,
-        Glass = 2,
+        Dielectric = 2,
         Light = 3,
     }
 }

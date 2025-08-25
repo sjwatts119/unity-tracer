@@ -16,11 +16,11 @@ Shader "RayTracer/RayShader"
             #define EPSILON 0.001       // A small value to offset rays to avoid self-intersection
 
             /*
-             * Material Types (instead of enum)
+             * Material Types
              */
             #define MATERIAL_LAMBERTIAN 0
             #define MATERIAL_METAL 1
-            #define MATERIAL_GLASS 2
+            #define MATERIAL_DIELECTRIC 2
             #define MATERIAL_LIGHT 3
 
             /*
@@ -229,6 +229,14 @@ Shader "RayTracer/RayShader"
                 return hitRecord;
             }
 
+            // Use the schlick approximation to estimate the reflectance at a dielectric surface
+            float SchlickReflectance(float cosine, float refractiveIndex)
+            {
+                float r0 = (1.0 - refractiveIndex) / (1.0 + refractiveIndex);
+                r0 = r0 * r0;
+                return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
+            }
+
             /*
              * Methods
              */
@@ -283,6 +291,42 @@ Shader "RayTracer/RayShader"
                 return scatter;
             }
 
+            // Scatter the ray for a Dielectric material
+            RayScatter ScatterDielectric(Ray ray, RayHit hit, Material material, inout uint seed)
+            {
+                RayScatter scatter;
+                
+                float3 attenuation = float3(1, 1, 1); // For now, dielectrics don't attenuate the ray (no colour change)
+                float refractionRatio = hit.frontFace ? (1.0 / material.refractiveIndex) : material.refractiveIndex;
+
+                // Calculate reflection and refraction directions
+                float3 unitDirection = normalize(ray.direction);
+                float cosTheta = min(dot(-unitDirection, hit.normal), 1.0);
+                float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+
+                float3 direction;
+
+                // Check for total internal reflection
+                bool cannotRefract = refractionRatio * sinTheta > 1.0;
+                
+                // Use Schlick's approximation to determine reflection probability
+                float reflectance = SchlickReflectance(cosTheta, refractionRatio);
+                bool shouldReflect = cannotRefract || (reflectance > PCGRandomFloat(seed));
+
+                if (shouldReflect){
+                    direction = reflect(unitDirection, hit.normal);
+                } else {
+                    direction = refract(unitDirection, hit.normal, refractionRatio);
+                }
+
+                // Populate the scatter info
+                scatter.scatteredRay = CreateRay(hit.position, normalize(direction));
+                scatter.attenuation = attenuation;
+                scatter.emission = material.emission;
+                scatter.didScatter = true; // Dielectric always scatters
+                return scatter;
+            }
+
             // Get a scatter object based on the material type
             RayScatter ScatterByMaterial(Ray ray, RayHit hit, Material material, inout uint seed)
             {
@@ -292,7 +336,10 @@ Shader "RayTracer/RayShader"
                 } else if (material.type == MATERIAL_LAMBERTIAN)
                 {
                     return ScatterLambertian(ray, hit, material, seed);
-                }
+                } else if (material.type == MATERIAL_DIELECTRIC)
+                {
+                    return ScatterDielectric(ray, hit, material, seed);
+                } 
 
                 return ScatterLambertian(ray, hit, material, seed); // Default to Lambertian if for some reason we get an unknown material
             }

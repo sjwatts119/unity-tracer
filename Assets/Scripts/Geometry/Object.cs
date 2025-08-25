@@ -16,8 +16,8 @@ namespace Geometry
         [SerializeField, Range(0f, 1f)]
         private float fuzz = 0.0f;
         
-        [Header("Glass Properties")]
-        [SerializeField, Range(0.1f, 3.0f)]
+        [Header("Dielectric Properties")]
+        [SerializeField, Range(1.0f, 3.0f)]
         private float refractiveIndex = 1.5f;
         
         [Header("Emission Properties")]
@@ -59,8 +59,8 @@ namespace Geometry
                 case MaterialType.Metal:
                     ValidateMetal();
                     break;
-                case MaterialType.Glass:
-                    ValidateGlass();
+                case MaterialType.Dielectric:
+                    ValidateDielectric();
                     break;
                 case MaterialType.Light:
                     ValidateLight();
@@ -104,9 +104,9 @@ namespace Geometry
             fuzz = Mathf.Clamp01(fuzz);
         }
 
-        private void ValidateGlass()
+        private void ValidateDielectric()
         {
-            // Glass shouldn't have fuzz or emission
+            // Dielectrics shouldn't have fuzz or emission
             emission = Color.black;
             fuzz = 0f;
             
