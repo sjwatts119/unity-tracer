@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Geometry
 {
-    public abstract class Object<T> : MonoBehaviour where T : struct, HasMaterial
+    public abstract class Object<T> : MonoBehaviour
     {
         [Header("Material Properties")]
         [SerializeField] private MaterialType materialType = MaterialType.Lambertian;
@@ -30,7 +30,7 @@ namespace Geometry
         public float RefractiveIndex => refractiveIndex;
         public Color Emission => emission;
         
-        public abstract T ToShaderData();
+        public abstract T[] ToShaderData();
         
         protected ShaderStructs.Material GetMaterial()
         {
@@ -73,12 +73,10 @@ namespace Geometry
 
         private void ValidateLambertian()
         {
-            // Lambertian shouldn't have fuzz or emission or a non-default refractive index
             emission = Color.black;
             fuzz = 0f;
             refractiveIndex = 1f;
             
-            // Clamp albedo components to valid range [0,1]
             albedo = new Color(
                 Mathf.Clamp01(albedo.r),
                 Mathf.Clamp01(albedo.g),
@@ -89,11 +87,9 @@ namespace Geometry
 
         private void ValidateMetal()
         {
-            // Metal shouldn't have emission or a non-default refractive index
             emission = Color.black;
             refractiveIndex = 1f;
             
-            // Clamp albedo components to valid range [0,1]
             albedo = new Color(
                 Mathf.Clamp01(albedo.r),
                 Mathf.Clamp01(albedo.g),
@@ -106,11 +102,9 @@ namespace Geometry
 
         private void ValidateDielectric()
         {
-            // Dielectrics shouldn't have fuzz or emission
             emission = Color.black;
             fuzz = 0f;
             
-            // Clamp albedo components to valid range [0,1]
             albedo = new Color(
                 Mathf.Clamp01(albedo.r),
                 Mathf.Clamp01(albedo.g),
@@ -121,11 +115,9 @@ namespace Geometry
         
         private void ValidateLight()
         {
-            // Light shouldn't have fuzz or a non-default refractive index
             fuzz = 0f;
             refractiveIndex = 1f;
             
-            // Clamp albedo components to valid range [0,1]
             albedo = new Color(
                 Mathf.Clamp01(albedo.r),
                 Mathf.Clamp01(albedo.g),

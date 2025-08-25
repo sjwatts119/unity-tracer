@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Core;
 using Geometry;
 using UnityEngine;
@@ -198,67 +199,86 @@ public class RayTracedPostProcessor : MonoBehaviour
         _sphereBuffer?.Release();
         _sphereBuffer = null;
         
+        // Calculate total count
+        int totalCount = 0;
+        foreach (var sphere in spheres) totalCount += sphere.ToShaderData().Length;
+
         // Early exit if no spheres in scene
-        if (spheres.Length == 0)
+        if (totalCount == 0)
         {
             material.SetInt(SphereCountPropertyID, 0);
             return;
         }
 
-        // Convert scene spheres to shader data format
-        var sphereData = new ShaderStructs.Sphere[spheres.Length];
-        for (int i = 0; i < spheres.Length; i++)
+        // Collect all sphere data
+        var allSphereData = new ShaderStructs.Sphere[totalCount];
+        int index = 0;
+        
+        foreach (var sphere in spheres)
         {
-            sphereData[i] = spheres[i].ToShaderData();
+            var data = sphere.ToShaderData();
+            for (int i = 0; i < data.Length; i++)
+                allSphereData[index++] = data[i];
         }
 
         // Create and populate compute buffer
-        _sphereBuffer = new ComputeBuffer(sphereData.Length, System.Runtime.InteropServices.Marshal.SizeOf<ShaderStructs.Sphere>());
-        _sphereBuffer.SetData(sphereData);
+        _sphereBuffer = new ComputeBuffer(allSphereData.Length, System.Runtime.InteropServices.Marshal.SizeOf<ShaderStructs.Sphere>());
+        _sphereBuffer.SetData(allSphereData);
         
         // Bind buffer to shader
         material.SetBuffer(SphereBufferPropertyID, _sphereBuffer);
-        material.SetInt(SphereCountPropertyID, sphereData.Length);
+        material.SetInt(SphereCountPropertyID, allSphereData.Length);
     }
 
     void PopulateQuadData(Material material)
     {
-        // Find both quad and plane objects in scene
         var quads = FindObjectsByType<Quad>(FindObjectsSortMode.None);
         var planes = FindObjectsByType<Plane>(FindObjectsSortMode.None);
-    
-        // Clean up existing buffer
+        var cuboids = FindObjectsByType<Cuboid>(FindObjectsSortMode.None);
+
         _quadBuffer?.Release();
         _quadBuffer = null;
-    
-        int totalCount = quads.Length + planes.Length;
-    
-        // Early exit if no quads or planes in scene
+
+        // Calculate total count
+        int totalCount = 0;
+        foreach (var quad in quads) totalCount += quad.ToShaderData().Length;
+        foreach (var plane in planes) totalCount += plane.ToShaderData().Length;
+        foreach (var cuboid in cuboids) totalCount += cuboid.ToShaderData().Length;
+
         if (totalCount == 0)
         {
             material.SetInt(QuadCountPropertyID, 0);
             return;
         }
-    
-        // Combine quads and planes into single buffer
+
         var quadData = new ShaderStructs.Quad[totalCount];
         int index = 0;
-    
-        for (int i = 0; i < quads.Length; i++)
+
+        // Add all quads
+        foreach (var quad in quads)
         {
-            quadData[index++] = quads[i].ToShaderData();
+            var data = quad.ToShaderData();
+            for (int i = 0; i < data.Length; i++)
+                quadData[index++] = data[i];
         }
-    
-        for (int i = 0; i < planes.Length; i++)
+
+        foreach (var plane in planes)
         {
-            quadData[index++] = planes[i].ToShaderData();
+            var data = plane.ToShaderData();
+            for (int i = 0; i < data.Length; i++)
+                quadData[index++] = data[i];
         }
-    
-        // Create and populate compute buffer
+
+        foreach (var cuboid in cuboids)
+        {
+            var data = cuboid.ToShaderData();
+            for (int i = 0; i < data.Length; i++)
+                quadData[index++] = data[i];
+        }
+
         _quadBuffer = new ComputeBuffer(quadData.Length, System.Runtime.InteropServices.Marshal.SizeOf<ShaderStructs.Quad>());
         _quadBuffer.SetData(quadData);
-    
-        // Bind buffer to shader
+
         material.SetBuffer(QuadBufferPropertyID, _quadBuffer);
         material.SetInt(QuadCountPropertyID, quadData.Length);
     }

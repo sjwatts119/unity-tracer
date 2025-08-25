@@ -11,13 +11,16 @@ namespace Geometry
             return Mathf.Max(scale.x, scale.y, scale.z) * 0.5f;
         }
 
-        public override ShaderStructs.Sphere ToShaderData()
+        public override ShaderStructs.Sphere[] ToShaderData()
         {
-            return new ShaderStructs.Sphere
+            return new ShaderStructs.Sphere[]
             {
-                centre = transform.position,
-                radius = CalculateRadius(),
-                material = GetMaterial()
+                new ShaderStructs.Sphere
+                {
+                    centre = transform.position,
+                    radius = CalculateRadius(),
+                    material = GetMaterial()
+                }
             };
         }
     }
