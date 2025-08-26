@@ -1,30 +1,28 @@
-﻿using UnityEngine;
-using Core;
+﻿using Geometry.Abstract;
+using Geometry.Interfaces;
+using Vector3 = UnityEngine.Vector3;
 
 namespace Geometry
 {
-    public class Plane : Object<ShaderStructs.Quad>
+    public class Plane : TraceablePrimitive
     {
-        public override ShaderStructs.Quad[] ToShaderData()
+        // Unity's planes are 10x10 versus quads being 1x1, so we just hack in a scale factor lol
+        private const float ScaleFactor = 10f;
+        
+        private Vector3 ScaledRight => transform.right * transform.localScale.y * ScaleFactor;
+        
+        private Vector3 ScaledForward => transform.forward * transform.localScale.z * ScaleFactor;
+
+        private Vector3 Corner => transform.position - (ScaledRight * 0.5f) - (ScaledForward * 0.5f);
+
+        public override IPrimitive ToPrimitive()
         {
-            // Unity's default plane is 10x10 versus a quad being 1x1, just hack in a scale factor lol
-            const float planeSize = 10f;
-            
-            Vector3 scaledRight = transform.right * transform.localScale.y * planeSize;
-            Vector3 scaledForward = transform.forward * transform.localScale.z * planeSize;
-            
-            // Calculate corner as bottom-left of the plane
-            Vector3 corner = transform.position - (scaledRight * 0.5f) - (scaledForward * 0.5f);
-            
-            return new ShaderStructs.Quad[]
+            return new Geometry.Structs.Quad
             {
-                new ShaderStructs.Quad
-                {
-                    q = corner,
-                    u = scaledRight,
-                    v = scaledForward,
-                    material = GetMaterial()
-                }
+                q = Corner,
+                u = ScaledRight,
+                v = ScaledForward,
+                material = GetMaterial()
             };
         }
     }

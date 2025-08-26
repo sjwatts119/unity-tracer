@@ -1,13 +1,14 @@
 ﻿using System.IO;
 using UnityEngine;
 
-namespace Core
+namespace Shaders
 {
-    public class RayShader
+    public class AccumulationShader
     {
-        private const string Name = "RayTracer/RayShader";
+        private const string Name = "RayTracer/AccumulationShader";
         private static Material _material;
 
+        // Get a cached material instance from the shader
         public static Material Material
         {
             get

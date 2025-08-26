@@ -1,12 +1,14 @@
-﻿using Core;
-using UnityEngine;
+﻿using UnityEngine;
+using Vector3 = UnityEngine.Vector3;
+using Materials.Structs;
 
-namespace Geometry
+namespace Geometry.Abstract
 {
-    public abstract class Object<T> : MonoBehaviour
+    public abstract class Traceable : UnityEngine.MonoBehaviour
     {
         [Header("Material Properties")]
-        [SerializeField] private MaterialType materialType = MaterialType.Lambertian;
+        [SerializeField]
+        private MaterialType materialType = MaterialType.Lambertian;
         
         [Header("Base Properties")]
         [SerializeField, ColorUsage(false)]
@@ -28,19 +30,9 @@ namespace Geometry
         [SerializeField, Range(0f, 30f)]
         private float emissionStrength = 1f;
 
-        public MaterialType MaterialType => materialType;
-        public Color Albedo => albedo;
-        public float Fuzz => fuzz;
-        public float RefractiveIndex => refractiveIndex;
-        public Color Emission => emission;
-        
-        public float EmissionStrength => emissionStrength;
-        
-        public abstract T[] ToShaderData();
-        
-        protected ShaderStructs.Material GetMaterial()
+        protected Materials.Structs.Material GetMaterial()
         {
-            return new ShaderStructs.Material
+            return new Materials.Structs.Material
             {
                 type = materialType,
                 albedo = new Vector3(albedo.r, albedo.g, albedo.b),
@@ -56,7 +48,7 @@ namespace Geometry
             ValidateMaterial();
         }
 
-        protected void ValidateMaterial()
+        private void ValidateMaterial()
         {
             switch (materialType) 
             {

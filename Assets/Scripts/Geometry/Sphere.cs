@@ -1,26 +1,25 @@
-﻿using UnityEngine;
-using Core;
+﻿using Geometry.Abstract;
+using Geometry.Interfaces;
+using UnityEngine;
+using Vector3 = UnityEngine.Vector3;
 
 namespace Geometry
 {
-    public class Sphere : Object<ShaderStructs.Sphere>
+    public class Sphere : TraceablePrimitive
     {
-        private float CalculateRadius()
+        private Vector3 LocalScale => transform.localScale;
+        
+        private Vector3 LocalPosition => transform.localPosition;
+        
+        private float ScaledRadius => Mathf.Max(LocalScale.x, LocalScale.y, LocalScale.z) * 0.5f;
+        
+        public override IPrimitive ToPrimitive()
         {
-            Vector3 scale = transform.localScale;
-            return Mathf.Max(scale.x, scale.y, scale.z) * 0.5f;
-        }
-
-        public override ShaderStructs.Sphere[] ToShaderData()
-        {
-            return new ShaderStructs.Sphere[]
+            return new Geometry.Structs.Sphere
             {
-                new ShaderStructs.Sphere
-                {
-                    centre = transform.position,
-                    radius = CalculateRadius(),
-                    material = GetMaterial()
-                }
+                centre = LocalPosition,
+                radius = ScaledRadius,
+                material = GetMaterial()
             };
         }
     }
