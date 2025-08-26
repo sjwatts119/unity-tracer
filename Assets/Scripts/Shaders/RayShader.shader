@@ -473,8 +473,8 @@ Shader "RayTracer/RayShader"
 
                 // Transform the ray into the cuboid's local space
                 float3 rayToCentre = ray.origin - cuboid.centre;
-                float3 localOrigin = mul(cuboid.worldToLocal, float4(rayToCentre, 1.0)).xyz;
-                float3 localDirection = mul(cuboid.worldToLocal, float4(ray.direction, 0.0)).xyz;
+                float3 localOrigin = mul((float3x3)cuboid.worldToLocal, rayToCentre);
+                float3 localDirection = mul((float3x3)cuboid.worldToLocal, ray.direction);
 
                 // Define the half-size of the cuboid in local space
                 float3 halfSize = cuboid.size * 0.5;
@@ -719,11 +719,11 @@ Shader "RayTracer/RayShader"
                     rayColour *= scatter.attenuation;
 
                     // Russian roulette termination to prevent spending resources on hardly contributing rays
-                    if (depth < 3) continue; // Don't terminate the first few bounces
+                    if (depth < 2) continue; // Don't terminate the first couple of bounces
 
-                    // Don't terminate if the ray is still bright (over 1% in any channel)
+                    // Don't terminate if the ray is still bright (over 10% in any channel)
                     float maxComponent = max(rayColour.r, max(rayColour.g, rayColour.b));
-                    if (maxComponent > 0.01) continue;
+                    if (maxComponent > 0.1) continue;
 
                     // Survival probability is directly proportional to brightness
                     if (PCGRandomFloat(seed) > maxComponent) break;
