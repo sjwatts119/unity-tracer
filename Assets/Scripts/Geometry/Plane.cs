@@ -9,7 +9,7 @@ namespace Geometry
         // Unity's planes are 10x10 versus quads being 1x1, so we just hack in a scale factor lol
         private const float ScaleFactor = 10f;
         
-        private Vector3 ScaledRight => transform.right * transform.localScale.y * ScaleFactor;
+        private Vector3 ScaledRight => transform.right * transform.localScale.x * ScaleFactor;
         
         private Vector3 ScaledForward => transform.forward * transform.localScale.z * ScaleFactor;
 

@@ -127,10 +127,9 @@ namespace Geometry.Abstract
             );
             
             emission = new Color(
-                Mathf.Max(0f, emission.r),
-                Mathf.Max(0f, emission.g),
-                Mathf.Max(0f, emission.b),
-                emission.a
+                Mathf.Clamp01(emission.r),
+                Mathf.Clamp01(emission.g),
+                Mathf.Clamp01(emission.b)
             );
         }
     }
