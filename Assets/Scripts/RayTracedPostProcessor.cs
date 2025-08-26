@@ -51,6 +51,10 @@ public class RayTracedPostProcessor : MonoBehaviour
     private static readonly int SphereCountPropertyID = Shader.PropertyToID("SphereCount");
     private static readonly int QuadBufferPropertyID = Shader.PropertyToID("QuadBuffer");
     private static readonly int QuadCountPropertyID = Shader.PropertyToID("QuadCount");
+    private static readonly int CuboidBufferPropertyID = Shader.PropertyToID("CuboidBuffer");
+    private static readonly int CuboidCountPropertyID = Shader.PropertyToID("CuboidCount");
+    // private static readonly int TriangleBufferPropertyID = Shader.PropertyToID("TriangleBuffer");
+    // private static readonly int TriangleCountPropertyID = Shader.PropertyToID("TriangleCount");
     private static readonly int CameraFocalDistancePropertyID = Shader.PropertyToID("CameraFocalDistance");
     private static readonly int CameraPlaneWidthPropertyID = Shader.PropertyToID("CameraPlaneWidth");
     private static readonly int CameraPlaneHeightPropertyID = Shader.PropertyToID("CameraPlaneHeight");
@@ -99,8 +103,9 @@ public class RayTracedPostProcessor : MonoBehaviour
         PopulateRenderingData(rayMaterial);
         
         PopulateBufferData<Sphere, Geometry.Structs.Sphere>(ref _sphereBuffer, rayMaterial, SphereBufferPropertyID, SphereCountPropertyID);
+        PopulateBufferData<Cuboid, Geometry.Structs.Cuboid>(ref _cuboidBuffer, rayMaterial, CuboidBufferPropertyID, CuboidCountPropertyID);
+        
         PopulateQuadData(rayMaterial);
-
         
         // If we are not accumulating frames, just render the current frame
         if (!accumulateFrames)
@@ -315,6 +320,7 @@ public class RayTracedPostProcessor : MonoBehaviour
     {
         _sphereBuffer?.Release();
         _quadBuffer?.Release();
+        _cuboidBuffer?.Release();
     }
 
     void ReleaseAccumulatedTextures()

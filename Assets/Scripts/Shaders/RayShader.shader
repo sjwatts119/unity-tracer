@@ -90,6 +90,21 @@ Shader "RayTracer/RayShader"
                 float2 pixelCoordinates : TEXCOORD0;
             };
 
+            struct AABB
+            {
+                float3 min;
+                float3 max;
+            };
+
+            struct Cuboid
+            {
+                float3 centre;
+                float3 size;
+                float4x4 worldToLocal;
+                float4x4 localToWorld;
+                Material material;
+            };
+
             /*
              * Struct "Constructors"
              */
@@ -130,6 +145,10 @@ Shader "RayTracer/RayShader"
             // Quad
             StructuredBuffer<Quad> QuadBuffer;
             int QuadCount;
+
+            // Cuboid
+            StructuredBuffer<Cuboid> CuboidBuffer;
+            int CuboidCount;
 
             // Camera
             float CameraFocalDistance;
@@ -357,7 +376,7 @@ Shader "RayTracer/RayShader"
                 RayScatter scatter;
                 
                 float3 attenuation = float3(1, 1, 1); // For now, dielectrics don't attenuate the ray (no colour change)
-                float refractionRatio = hit.frontFace ? (1.0 / material.refractiveIndex) : material.refractiveIndex;
+                float refractionRatio = hit.frontFace ? (rcp(material.refractiveIndex)) : material.refractiveIndex;
 
                 // Calculate reflection and refraction directions
                 float3 unitDirection = normalize(ray.direction);
@@ -423,6 +442,84 @@ Shader "RayTracer/RayShader"
             /*
              * Ray-Geometry intersection
              */
+
+            // HLSL Optimised slab intersection method, thanks https://medium.com/@bromanz
+            bool SlabIntersection(float3 origin, float3 invDir, float3 boxMin, float3 boxMax, Interval rayInterval, out float tNear, out float tFar)
+            {
+                float3 t0 = (boxMin - origin) * invDir;
+                float3 t1 = (boxMax - origin) * invDir;
+                
+                float3 tMin = min(t0, t1);
+                float3 tMax = max(t0, t1);
+                
+                tNear = max(rayInterval.min, max(tMin.x, max(tMin.y, tMin.z)));
+                tFar = min(rayInterval.max, min(tMax.x, min(tMax.y, tMax.z)));
+                
+                return tNear < tFar;
+            }
+
+            // Check if a ray hits an AABB
+            bool RayHitsAABB(Ray ray, Interval rayInterval, AABB aabb)
+            {
+                float3 invDir = rcp(ray.direction);
+                float tNear, tFar; // Unused out parameters
+                return SlabIntersection(ray.origin, invDir, aabb.min, aabb.max, rayInterval, tNear, tFar);
+            }
+
+            // Check if a ray hits a cuboid
+            RayHit RayHitsCuboid(Ray ray, Interval rayInterval, Cuboid cuboid)
+            {
+                RayHit hit = (RayHit)0;
+
+                // Transform the ray into the cuboid's local space
+                float3 rayToCentre = ray.origin - cuboid.centre;
+                float3 localOrigin = mul(cuboid.worldToLocal, float4(rayToCentre, 1.0)).xyz;
+                float3 localDirection = mul(cuboid.worldToLocal, float4(ray.direction, 0.0)).xyz;
+
+                // Define the half-size of the cuboid in local space
+                float3 halfSize = cuboid.size * 0.5;
+                float3 inverseDirection = rcp(localDirection);
+                
+                float tNear, tFar;
+                if (!SlabIntersection(localOrigin, inverseDirection, -halfSize, halfSize, rayInterval, tNear, tFar))
+                {
+                    return hit;
+                }
+                
+                // Determine the nearest valid intersection t within the ray interval
+                float t = (tNear >= rayInterval.min) ? tNear : tFar;
+
+                // Check if t is within the ray interval
+                if (t < rayInterval.min || t > rayInterval.max)
+                {
+                    return hit;
+                }
+    
+                // Calculate normal
+                float3 localHitPoint = localOrigin + t * localDirection;
+                float3 abs_d = abs(localHitPoint / halfSize);
+
+                // Determine which face was hit based on the largest component of the normalised hit point
+                float3 localNormal;
+                if (abs_d.x > abs_d.y && abs_d.x > abs_d.z)
+                    localNormal = float3(sign(localHitPoint.x), 0, 0);
+                else if (abs_d.y > abs_d.z)  
+                    localNormal = float3(0, sign(localHitPoint.y), 0);
+                else
+                    localNormal = float3(0, 0, sign(localHitPoint.z));
+
+                // Transform the local normal back to world space
+                float3 worldNormal = normalize(mul(cuboid.localToWorld, float4(localNormal, 0.0)).xyz);
+
+                // We have a valid intersection, so populate the hit info
+                hit.didHit = true;
+                hit.t = t;
+                hit.position = ray.origin + t * ray.direction;
+                hit.material = cuboid.material;
+                hit = RayHitSetFaceNormal(hit, ray, worldNormal);
+                
+                return hit;
+            }
 
             RayHit RayHitsQuad(Ray ray, Interval rayInterval, Quad quad)
             {
@@ -540,6 +637,21 @@ Shader "RayTracer/RayShader"
 
                     // Check for intersection with the sphere
                     RayHit hit = RayHitsSphere(ray, CreateInterval(EPSILON, closestHit.t), sphere);
+
+                    // If we have a hit and it's closer than our current closest hit, update closest hit
+                    if (hit.didHit && hit.t < closestHit.t)
+                    {
+                        closestHit = hit;
+                    }
+                }
+
+                // Iterate over all cuboids to find the closest hit
+                for (int i = 0; i < CuboidCount; i++)
+                {
+                    Cuboid cuboid = CuboidBuffer[i];
+
+                    // Check for intersection with the cuboid
+                    RayHit hit = RayHitsCuboid(ray, CreateInterval(EPSILON, closestHit.t), cuboid);
 
                     // If we have a hit and it's closer than our current closest hit, update closest hit
                     if (hit.didHit && hit.t < closestHit.t)

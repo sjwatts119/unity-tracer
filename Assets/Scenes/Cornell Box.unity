@@ -270,7 +270,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   renderedFrames: 0
-  samplesPerPixel: 100
+  samplesPerPixel: 18
   rayMaxDepth: 100
   accumulateFrames: 1
   cameraFocalDistance: 10.8

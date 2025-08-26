@@ -25,8 +25,9 @@ namespace Geometry.Structs
     public struct Cuboid : IPrimitive
     {
         public Vector3 centre;
-        public Vector3 size;           // Width, height, depth
-        public Vector4 rotation;       // Rotation as a quaternion (x, y, z, w)
+        public Vector3 size; // Scale in each dimension
+        public Matrix4x4 worldToLocal; // Inverse of localToWorld
+        public Matrix4x4 localToWorld; // Transformation matrix from local to world space
         public Materials.Structs.Material material;
     }
     
