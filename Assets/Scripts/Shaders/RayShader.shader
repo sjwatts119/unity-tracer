@@ -382,9 +382,7 @@ Shader "RayTracer/RayShader"
                 float3 unitDirection = normalize(ray.direction);
                 float cosTheta = min(dot(-unitDirection, hit.normal), 1.0);
                 float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
-
-                float3 direction;
-
+                
                 // Check for total internal reflection
                 bool cannotRefract = refractionRatio * sinTheta > 1.0;
                 
@@ -392,14 +390,17 @@ Shader "RayTracer/RayShader"
                 float reflectance = SchlickReflectance(cosTheta, refractionRatio);
                 bool shouldReflect = cannotRefract || (reflectance > PCGRandomFloat(seed));
 
+                float3 direction;
+
                 if (shouldReflect){
                     direction = reflect(unitDirection, hit.normal);
+                    scatter.scatteredRay = CreateRay(hit.position + hit.normal * EPSILON, direction);
                 } else {
                     direction = refract(unitDirection, hit.normal, refractionRatio);
+                    scatter.scatteredRay = CreateRay(hit.position + direction * EPSILON, direction);
                 }
 
                 // Populate the scatter info
-                scatter.scatteredRay = CreateRay(hit.position, normalize(direction));
                 scatter.attenuation = attenuation;
                 scatter.emission = float3 (0, 0, 0);
                 scatter.didScatter = true; // Dielectric always scatters
@@ -486,24 +487,31 @@ Shader "RayTracer/RayShader"
                     return hit;
                 }
                 
-                // Determine the nearest valid intersection t within the ray interval
-                float t = (tNear >= rayInterval.min) ? tNear : tFar;
+                // Check if ray origin is inside the cube
+                bool rayStartsInside = all(abs(localOrigin) <= halfSize);
+
+                // If the ray starts inside the cuboid, position this interval to start at the far face
+                float t = rayStartsInside ? tFar : (tNear >= rayInterval.min) ? tNear : tFar;
 
                 // Check if t is within the ray interval
                 if (t < rayInterval.min || t > rayInterval.max)
                 {
                     return hit;
                 }
-    
-                // Calculate normal
+
+                // Get hit points in local and world space
                 float3 localHitPoint = localOrigin + t * localDirection;
-                float3 abs_d = abs(localHitPoint / halfSize);
+                float3 worldHitPoint = ray.origin + t * ray.direction;
+                
+                // Calculate normal based on which face was hit
+                float3 faceDistance = abs(localHitPoint / halfSize);
+                
+                float3 localNormal;
 
                 // Determine which face was hit based on the largest component of the normalised hit point
-                float3 localNormal;
-                if (abs_d.x > abs_d.y && abs_d.x > abs_d.z)
+                if (faceDistance.x > faceDistance.y - EPSILON && faceDistance.x > faceDistance.z - EPSILON)
                     localNormal = float3(sign(localHitPoint.x), 0, 0);
-                else if (abs_d.y > abs_d.z)  
+                else if (faceDistance.y > faceDistance.z - EPSILON)  
                     localNormal = float3(0, sign(localHitPoint.y), 0);
                 else
                     localNormal = float3(0, 0, sign(localHitPoint.z));
@@ -514,7 +522,7 @@ Shader "RayTracer/RayShader"
                 // We have a valid intersection, so populate the hit info
                 hit.didHit = true;
                 hit.t = t;
-                hit.position = ray.origin + t * ray.direction;
+                hit.position = worldHitPoint;
                 hit.material = cuboid.material;
                 hit = RayHitSetFaceNormal(hit, ray, worldNormal);
                 
@@ -528,7 +536,7 @@ Shader "RayTracer/RayShader"
                 float D = dot(normal, quad.q);
                 float denom = dot(normal, ray.direction);
 
-                // Initialsze hit info with hit set to false for now
+                // Initialise hit info with hit set to false for now
                 RayHit hit = (RayHit)0;
 
                 if (abs(denom) < EPSILON)
