@@ -719,17 +719,20 @@ Shader "RayTracer/RayShader"
                     rayColour *= scatter.attenuation;
 
                     // Russian roulette termination to prevent spending resources on hardly contributing rays
-                    if (depth < 2) continue; // Don't terminate the first couple of bounces
+                    if (depth < 5) continue;
 
-                    // Don't terminate if the ray is still bright (over 10% in any channel)
+                    // Calculate the maximum component of the current ray colour
                     float maxComponent = max(rayColour.r, max(rayColour.g, rayColour.b));
-                    if (maxComponent > 0.1) continue;
-
-                    // Survival probability is directly proportional to brightness
-                    if (PCGRandomFloat(seed) > maxComponent) break;
-
-                    // Survived, so scale up the colour to maintain energy
-                    rayColour /= maxComponent;
+                    
+                    // Clamp our minimum survival probability to avoid creating excessively bright or dark pixels
+                    float survivalProbability = max(maxComponent, 0.1);  
+                    
+                    if (PCGRandomFloat(seed) > survivalProbability) {
+                        break;
+                    }
+                    
+                    // Survived, so scale up the colour to keep the same amount of energy in the scene on average
+                    rayColour /= survivalProbability;
                 }
                 
                 return accumulatedLight;
