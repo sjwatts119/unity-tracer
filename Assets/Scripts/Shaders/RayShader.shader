@@ -777,7 +777,7 @@ Shader "RayTracer/RayShader"
                 float3 camUp = CameraLocalToWorld._m01_m11_m21;
 
                 // Generate an RNG seed for this pixel
-                uint pixelSeed = pixelCoord.x * 73856093u ^ pixelCoord.y * 19349663u + FrameNumber * 834123;
+                uint pixelSeed = pixelCoord.x * 7919u + pixelCoord.y * 7927u + FrameNumber * 1009u;
 
                 // Start at black as if we have no intersections, light wouldn't be reflected to the camera
                 float3 pixelColour = float3(0, 0, 0);
@@ -785,14 +785,11 @@ Shader "RayTracer/RayShader"
                 // Sample multiple rays per pixel for anti-aliasing
                 for (int sample = 0; sample < SamplesPerPixel; sample++)
                 {
-                    // Make a seed for this sample
-                    uint sampleSeed = pixelSeed + sample * 12345u + FrameNumber * 834123;
-
                     // Create the ray
-                    Ray ray = GetRay(sampleSeed, camRight, camUp, pixelData);
+                    Ray ray = GetRay(pixelSeed, camRight, camUp, pixelData);
                     
                     // Accumulate colour
-                    pixelColour += GetRayColour(ray, sampleSeed);
+                    pixelColour += GetRayColour(ray, pixelSeed);
                 }
                 
                 // Average the samples
