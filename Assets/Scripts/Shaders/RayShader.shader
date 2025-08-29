@@ -256,7 +256,7 @@ Shader "RayTracer/RayShader"
 			// Random value in normal distribution (with mean=0 and sd=1)
 			float PCGRandomValueNormalDistribution(inout uint state)
 			{
-				float theta = 2 * 3.1415926 * PCGRandomFloat(state);
+				float theta = 2 * UNITY_PI * PCGRandomFloat(state);
 				float rho = sqrt(-2 * log(PCGRandomFloat(state)));
 				return rho * cos(theta);
 			}
@@ -391,16 +391,18 @@ Shader "RayTracer/RayShader"
                 bool shouldReflect = cannotRefract || (reflectance > PCGRandomFloat(seed));
 
                 float3 direction;
+                float3 offsetDirection;
 
                 if (shouldReflect){
                     direction = reflect(unitDirection, hit.normal);
-                    scatter.scatteredRay = CreateRay(hit.position + hit.normal * EPSILON, direction);
+                    offsetDirection = hit.normal;
                 } else {
                     direction = refract(unitDirection, hit.normal, refractionRatio);
-                    scatter.scatteredRay = CreateRay(hit.position + direction * EPSILON, direction);
+                    offsetDirection = direction;
                 }
 
                 // Populate the scatter info
+                scatter.scatteredRay = CreateRay(hit.position + offsetDirection * EPSILON, direction);
                 scatter.attenuation = attenuation;
                 scatter.emission = float3 (0, 0, 0);
                 scatter.didScatter = true; // Dielectric always scatters
@@ -558,9 +560,10 @@ Shader "RayTracer/RayShader"
                 float3 planarHitpoint = hitPoint - quad.q;
 
                 // Calculate barycentric coordinates (alpha, beta) for the hit point
-                float barycentricDenom = dot(cross(quad.u, quad.v), cross(quad.u, quad.v));
-                float alpha = dot(cross(planarHitpoint, quad.v), cross(quad.u, quad.v)) / barycentricDenom;
-                float beta = dot(cross(quad.u, planarHitpoint), cross(quad.u, quad.v)) / barycentricDenom;
+                float3 crossUV = cross(quad.u, quad.v);
+                float barycentricDenom = dot(crossUV, crossUV);
+                float alpha = dot(cross(planarHitpoint, quad.v), crossUV) / barycentricDenom;
+                float beta = dot(cross(quad.u, planarHitpoint), crossUV) / barycentricDenom;
 
                 // Check if the hit point is inside the quad bounds
                 if (!IsInteriorToQuad(quad, alpha, beta))
@@ -637,6 +640,7 @@ Shader "RayTracer/RayShader"
                 // Start with no hit
                 RayHit closestHit = (RayHit)0;
                 closestHit.t = INFINITY;
+                Interval rayInterval = CreateInterval(EPSILON, closestHit.t);
 
                 // Iterate over all spheres to find the closest hit
                 for (int i = 0; i < SphereCount; i++)
@@ -644,7 +648,8 @@ Shader "RayTracer/RayShader"
                     Sphere sphere = SphereBuffer[i];
 
                     // Check for intersection with the sphere
-                    RayHit hit = RayHitsSphere(ray, CreateInterval(EPSILON, closestHit.t), sphere);
+                    rayInterval.max = closestHit.t;
+                    RayHit hit = RayHitsSphere(ray, rayInterval, sphere);
 
                     // If we have a hit and it's closer than our current closest hit, update closest hit
                     if (hit.didHit && hit.t < closestHit.t)
@@ -659,7 +664,8 @@ Shader "RayTracer/RayShader"
                     Cuboid cuboid = CuboidBuffer[i];
 
                     // Check for intersection with the cuboid
-                    RayHit hit = RayHitsCuboid(ray, CreateInterval(EPSILON, closestHit.t), cuboid);
+                    rayInterval.max = closestHit.t;
+                    RayHit hit = RayHitsCuboid(ray, rayInterval, cuboid);
 
                     // If we have a hit and it's closer than our current closest hit, update closest hit
                     if (hit.didHit && hit.t < closestHit.t)
@@ -674,7 +680,8 @@ Shader "RayTracer/RayShader"
                     Quad quad = QuadBuffer[i];
 
                     // Check for intersection with the quad
-                    RayHit hit = RayHitsQuad(ray, CreateInterval(EPSILON, closestHit.t), quad);
+                    rayInterval.max = closestHit.t;
+                    RayHit hit = RayHitsQuad(ray, rayInterval, quad);
 
                     // If we have a hit and it's closer than our current closest hit, update closest hit
                     if (hit.didHit && hit.t < closestHit.t)
@@ -705,7 +712,7 @@ Shader "RayTracer/RayShader"
                         // float t = 0.5 * (ray.direction.y + 1.0); // Convert Y from [-1,1] to [0,1]
                         // float3 skyColor = lerp(float3(1.0, 1.0, 1.0), float3(0.5, 0.7, 1.0), t);
                         // return accumulatedLight + (skyColor * rayColour);
-                        return accumulatedLight * float3(0, 0, 0); // Black background
+                        return accumulatedLight; // Black background
                     }
 
                     // We hit something, so scatter the ray based on the material
@@ -755,7 +762,7 @@ Shader "RayTracer/RayShader"
                 // If we have defocus enabled, jitter the ray origin within a disk perpendicular to the view direction
                 if (CameraDefocusAngle > 0.0)
                 {
-                    float2 defocusJitter = PCGRandomUnitVectorInUnitDisk(sampleSeed) * CameraDefocusAngle * (CameraFocalDistance / _ScreenParams.xy);
+                    float2 defocusJitter = PCGRandomUnitVectorInUnitDisk(sampleSeed).xy * CameraDefocusAngle * (CameraFocalDistance / _ScreenParams.xy);
                     rayOrigin += (camRight * defocusJitter.x) + (camUp * defocusJitter.y);
                 }
 
