@@ -6,7 +6,9 @@ namespace Geometry.Abstract
     public abstract class TraceableGroup : Traceable
     {
         public abstract AABB ToAABB();
-        
-        public abstract PrimitiveGroup ToPrimitiveGroup(int currentTris, int currentSpheres, int currentQuads, int currentCuboids);
+    
+        // Return all primitives in this group, organized by type
+        public abstract PrimitiveCollection GetPrimitives();
     }
+
 }

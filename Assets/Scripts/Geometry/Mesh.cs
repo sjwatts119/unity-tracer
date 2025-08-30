@@ -1,4 +1,7 @@
-﻿using Geometry.Abstract;
+﻿// Assets/Scripts/Geometry/Mesh.cs
+
+using System;
+using Geometry.Abstract;
 using Geometry.Structs;
 using UnityEngine;
 
@@ -6,20 +9,24 @@ namespace Geometry
 {
     public class Mesh : TraceableGroup
     {
-        public Triangle[] Triangles => GetTriangles();
-        
-        // Probably add other primitive types later (spheres, quads, cuboids)
+        public override PrimitiveCollection GetPrimitives()
+        {
+            return new PrimitiveCollection
+            {
+                spheres = Array.Empty<Geometry.Structs.Sphere>(),
+                quads  = Array.Empty<Geometry.Structs.Quad>(),
+                cuboids = Array.Empty<Geometry.Structs.Cuboid>(),
+                triangles = GetTriangles()
+            };
+        }
         
         private Triangle[] GetTriangles()
         {
-            // Get the mesh from the MeshFilter component
             var mesh = GetComponent<MeshFilter>().sharedMesh;
-            
             var triangles = mesh.triangles;
             var vertices = mesh.vertices;
             var primitives = new Triangle[triangles.Length / 3];
             
-            // Convert each triangle to world space and create a Triangle primitive
             for (var i = 0; i < triangles.Length; i += 3)
             {
                 var v0 = transform.TransformPoint(vertices[triangles[i]]);
@@ -39,8 +46,7 @@ namespace Geometry
 
         public override AABB ToAABB()
         {
-            // for now we are just looking at triangles, this is really scuffed, but it works for testing
-            var triangles = Triangles;
+            var triangles = GetTriangles();
             
             if (triangles.Length == 0)
             {
@@ -50,6 +56,7 @@ namespace Geometry
                     max = Vector3.zero
                 };
             }
+            
             var min = triangles[0].v0;
             var max = triangles[0].v0;
             
@@ -65,34 +72,14 @@ namespace Geometry
                 max = max
             };
         }
-
-        public override PrimitiveGroup ToPrimitiveGroup(int sphereCount, int quadCount, int cuboidCount, int triangleCount)
-        {
-            return new PrimitiveGroup
-            {
-                sphereStart = sphereCount,
-                sphereCount = 0,
-                quadStart = quadCount,
-                quadCount = 0,
-                cuboidStart = cuboidCount,
-                cuboidCount = 0,
-                triangleStart = triangleCount,
-                triangleCount = Triangles.Length,
-                boundingBox = ToAABB()
-            };
-        }
         
         void OnDrawGizmosSelected()
         {
             var aabb = ToAABB();
-    
             Vector3 center = (aabb.min + aabb.max) * 0.5f;
             Vector3 size = aabb.max - aabb.min;
-    
             Gizmos.color = Color.green;
             Gizmos.DrawWireCube(center, size);
         }
     }
-    
-    
 }
