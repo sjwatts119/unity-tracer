@@ -28,6 +28,18 @@ Shader "RayTracer/RayShader"
             /*
              * Structs
              */
+
+            struct VertexToFragment
+            {
+                float4 screenPosition : SV_POSITION;
+                float2 pixelCoordinates : TEXCOORD0;
+            };
+
+            struct Interval
+            {
+                float min;
+                float max;
+            };
             
             struct Material
             {
@@ -37,12 +49,6 @@ Shader "RayTracer/RayShader"
                 float refractiveIndex;
                 float3 emission;
                 float emissionStrength;
-            };
-
-            struct Interval
-            {
-                float min;
-                float max;
             };
             
             struct Ray
@@ -69,6 +75,12 @@ Shader "RayTracer/RayShader"
                 float3 emission;
             };
 
+            struct AABB
+            {
+                float3 min;
+                float3 max;
+            };
+
             struct Sphere
             {
                 float3 centre;
@@ -84,18 +96,6 @@ Shader "RayTracer/RayShader"
                 Material material;
             };
 
-            struct VertexToFragment
-            {
-                float4 screenPosition : SV_POSITION;
-                float2 pixelCoordinates : TEXCOORD0;
-            };
-
-            struct AABB
-            {
-                float3 min;
-                float3 max;
-            };
-
             struct Cuboid
             {
                 float3 centre;
@@ -103,6 +103,23 @@ Shader "RayTracer/RayShader"
                 float4x4 worldToLocal;
                 float4x4 localToWorld;
                 Material material;
+            };
+
+            struct Triangle
+            {
+                float3 v0;
+                float3 v1;
+                float3 v2;
+                Material material;
+            };
+
+            struct PrimitiveGroup
+            {
+                int sphereStart; int sphereCount;
+                int quadStart; int quadCount;
+                int cuboidStart; int cuboidCount;
+                int triangleStart; int triangleCount;
+                AABB boundingBox;
             };
 
             /*
@@ -141,14 +158,26 @@ Shader "RayTracer/RayShader"
             // Sphere
             StructuredBuffer<Sphere> SphereBuffer;
             int SphereCount;
+            int GroupedSphereCount;
 
             // Quad
             StructuredBuffer<Quad> QuadBuffer;
             int QuadCount;
+            int GroupedQuadCount;
 
             // Cuboid
             StructuredBuffer<Cuboid> CuboidBuffer;
             int CuboidCount;
+            int GroupedCuboidCount;
+
+            // Triangle
+            StructuredBuffer<Triangle> TriangleBuffer;
+            int TriangleCount;
+            int GroupedTriangleCount;
+
+            // Primitive Group
+            StructuredBuffer<PrimitiveGroup> PrimitiveGroupBuffer;
+            int PrimitiveGroupCount;
 
             // Camera
             float CameraFocalDistance;
@@ -630,6 +659,69 @@ Shader "RayTracer/RayShader"
                 return hit;
             }
 
+            // Moller Trumbore intersection algorithm
+            RayHit RayHitsTriangle(Ray ray, Interval rayInterval, Triangle tri)
+            {
+                // Initialise hit info with hit set to false for now
+                RayHit hit = (RayHit)0;
+
+                // Calculate the two edge vectors of the triangle
+                float3 edge1 = tri.v1 - tri.v0;
+                float3 edge2 = tri.v2 - tri.v0;
+                
+                // Begin calculating the determinant - also used to calculate u parameter
+                float3 h = cross(ray.direction, edge2);
+                float a = dot(edge1, h);
+
+                // If the determinant is near zero, the ray is parallel to the triangle plane
+                if (abs(a) < EPSILON)
+                {
+                    return hit; // Ray is parallel to the triangle, so no intersection
+                }
+
+                float f = 1.0 / a;
+                float3 s = ray.origin - tri.v0;
+                
+                // Calculate the u parameter and test bounds
+                float u = f * dot(s, h);
+
+                // Check if the intersection is outside the triangle (u coordinate)
+                if (u < 0.0 || u > 1.0)
+                {
+                    return hit; // Intersection is outside the triangle bounds
+                }
+
+                // Prepare to test the v parameter
+                float3 q = cross(s, edge1);
+                
+                // Calculate the v parameter and test bounds
+                float v = f * dot(ray.direction, q);
+
+                // Check if the intersection is outside the triangle (v coordinate and u+v constraint)
+                if (v < 0.0 || u + v > 1.0)
+                {
+                    return hit; // Intersection is outside the triangle bounds
+                }
+
+                // Calculate the intersection distance t along the ray
+                float t = f * dot(edge2, q);
+
+                // Check if the intersection is within the ray interval
+                if (!IntervalContains(rayInterval, t))
+                {
+                    return hit; // Intersection is outside the ray interval
+                }
+
+                // We have a valid intersection, so populate the hit info
+                hit.didHit = true;
+                hit.t = t;
+                hit.position = ray.origin + t * ray.direction;
+                hit.material = tri.material;
+                hit = RayHitSetFaceNormal(hit, ray, normalize(cross(edge1, edge2)));
+
+                return hit;
+            }
+            
             /*
              * Ray Tracing
              */
@@ -637,60 +729,82 @@ Shader "RayTracer/RayShader"
             // Get the closest hit for a ray
             RayHit GetHit(Ray ray)
             {
-                // Start with no hit
                 RayHit closestHit = (RayHit)0;
                 closestHit.t = INFINITY;
                 Interval rayInterval = CreateInterval(EPSILON, closestHit.t);
 
-                // Iterate over all spheres to find the closest hit
-                for (int i = 0; i < SphereCount; i++)
+                // Calculate counts for individual primitives (not in groups)
+                int individualTriangleCount = TriangleCount - GroupedTriangleCount;
+                int individualSphereCount = SphereCount - GroupedSphereCount;
+                int individualQuadCount = QuadCount - GroupedQuadCount;
+                int individualCuboidCount = CuboidCount - GroupedCuboidCount;
+
+                // Test individual primitives first
+                for (int i = 0; i < individualSphereCount; i++)
                 {
                     Sphere sphere = SphereBuffer[i];
-
-                    // Check for intersection with the sphere
                     rayInterval.max = closestHit.t;
                     RayHit hit = RayHitsSphere(ray, rayInterval, sphere);
-
-                    // If we have a hit and it's closer than our current closest hit, update closest hit
                     if (hit.didHit && hit.t < closestHit.t)
                     {
                         closestHit = hit;
                     }
                 }
 
-                // Iterate over all cuboids to find the closest hit
-                for (int i = 0; i < CuboidCount; i++)
+                for (int i = 0; i < individualCuboidCount; i++)
                 {
                     Cuboid cuboid = CuboidBuffer[i];
-
-                    // Check for intersection with the cuboid
                     rayInterval.max = closestHit.t;
                     RayHit hit = RayHitsCuboid(ray, rayInterval, cuboid);
-
-                    // If we have a hit and it's closer than our current closest hit, update closest hit
                     if (hit.didHit && hit.t < closestHit.t)
                     {
                         closestHit = hit;
                     }
                 }
 
-                // Iterate over all quads to find the closest hit
-                for (int i = 0; i < QuadCount; i++)
+                for (int i = 0; i < individualQuadCount; i++)
                 {
                     Quad quad = QuadBuffer[i];
-
-                    // Check for intersection with the quad
                     rayInterval.max = closestHit.t;
                     RayHit hit = RayHitsQuad(ray, rayInterval, quad);
-
-                    // If we have a hit and it's closer than our current closest hit, update closest hit
                     if (hit.didHit && hit.t < closestHit.t)
                     {
                         closestHit = hit;
                     }
                 }
 
-                // In the future, we can add more geometry type collision checks here
+                for (int i = 0; i < individualTriangleCount; i++)
+                {
+                    Triangle tri = TriangleBuffer[i];
+                    rayInterval.max = closestHit.t;
+                    RayHit hit = RayHitsTriangle(ray, rayInterval, tri);
+                    if (hit.didHit && hit.t < closestHit.t)
+                    {
+                        closestHit = hit;
+                    }
+                }
+
+                // Test primitive groups with AABB culling
+                for (int i = 0; i < PrimitiveGroupCount; i++)
+                {
+                    PrimitiveGroup group = PrimitiveGroupBuffer[i];
+                    
+                    rayInterval.max = closestHit.t;
+                    if (!RayHitsAABB(ray, rayInterval, group.boundingBox))
+                        continue;
+                        
+                    // Test triangles in this group
+                    for (int j = group.triangleStart; j < group.triangleStart + group.triangleCount; j++)
+                    {
+                        Triangle tri = TriangleBuffer[j];
+                        rayInterval.max = closestHit.t;
+                        RayHit hit = RayHitsTriangle(ray, rayInterval, tri);
+                        if (hit.didHit && hit.t < closestHit.t)
+                        {
+                            closestHit = hit;
+                        }
+                    }
+                }
 
                 return closestHit;
             }

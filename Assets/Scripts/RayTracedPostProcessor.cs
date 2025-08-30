@@ -1,11 +1,16 @@
 using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using UnityEngine;
-using Geometry;
 using Geometry.Abstract;
 using Geometry.Interfaces;
+using Geometry.Structs;
 using Shaders;
+using Unity.VisualScripting;
+using Cuboid = Geometry.Cuboid;
 using Plane = Geometry.Plane;
+using Quad = Geometry.Quad;
+using Sphere = Geometry.Sphere;
 
 [ExecuteAlways, ImageEffectAllowedInSceneView]
 public class RayTracedPostProcessor : MonoBehaviour
@@ -41,27 +46,47 @@ public class RayTracedPostProcessor : MonoBehaviour
     private ComputeBuffer _sphereBuffer;
     private ComputeBuffer _quadBuffer;
     private ComputeBuffer _cuboidBuffer;
-    // private ComputeBuffer _triangleBuffer; // For future use
+    private ComputeBuffer _triangleBuffer;
+    private ComputeBuffer _groupBuffer;
     
     // Frame accumulation data
     private RenderTexture _accumulatedTexture;
     private Material _accumulationMaterial;
     
+    // Primitive Buffers
     private static readonly int SphereBufferPropertyID = Shader.PropertyToID("SphereBuffer");
-    private static readonly int SphereCountPropertyID = Shader.PropertyToID("SphereCount");
     private static readonly int QuadBufferPropertyID = Shader.PropertyToID("QuadBuffer");
-    private static readonly int QuadCountPropertyID = Shader.PropertyToID("QuadCount");
     private static readonly int CuboidBufferPropertyID = Shader.PropertyToID("CuboidBuffer");
+    private static readonly int TriangleBufferPropertyID = Shader.PropertyToID("TriangleBuffer");
+    
+    // Primitive Counts
+    private static readonly int SphereCountPropertyID = Shader.PropertyToID("SphereCount");
+    private static readonly int QuadCountPropertyID = Shader.PropertyToID("QuadCount");
     private static readonly int CuboidCountPropertyID = Shader.PropertyToID("CuboidCount");
-    // private static readonly int TriangleBufferPropertyID = Shader.PropertyToID("TriangleBuffer");
-    // private static readonly int TriangleCountPropertyID = Shader.PropertyToID("TriangleCount");
+    private static readonly int TriangleCountPropertyID = Shader.PropertyToID("TriangleCount");
+    
+    // Grouped Primitive Counts
+    private static readonly int GroupedSphereCountPropertyID = Shader.PropertyToID("GroupedSphereCount");
+    private static readonly int GroupedQuadCountPropertyID = Shader.PropertyToID("GroupedQuadCount");
+    private static readonly int GroupedCuboidCountPropertyID = Shader.PropertyToID("GroupedCuboidCount");
+    private static readonly int GroupedTriangleCountPropertyID = Shader.PropertyToID("GroupedTriangleCount");
+
+    // Primitive Groups
+    private static readonly int PrimitiveGroupBufferPropertyID = Shader.PropertyToID("PrimitiveGroupBuffer");
+    private static readonly int PrimitiveGroupCountPropertyID = Shader.PropertyToID("PrimitiveGroupCount");
+    
+    // Camera
     private static readonly int CameraFocalDistancePropertyID = Shader.PropertyToID("CameraFocalDistance");
     private static readonly int CameraPlaneWidthPropertyID = Shader.PropertyToID("CameraPlaneWidth");
     private static readonly int CameraPlaneHeightPropertyID = Shader.PropertyToID("CameraPlaneHeight");
     private static readonly int CameraDefocusAnglePropertyID = Shader.PropertyToID("CameraDefocusAngle");
     private static readonly int CameraLocalToWorldPropertyID = Shader.PropertyToID("CameraLocalToWorld");
+    
+    // Anti-aliasing
     private static readonly int SamplesPerPixelPropertyID = Shader.PropertyToID("SamplesPerPixel");
     private static readonly int RayMaxDepthPropertyID = Shader.PropertyToID("RayMaxDepth");
+    
+    // Frame accumulation
     private static readonly int FrameNumberPropertyID = Shader.PropertyToID("FrameNumber");
     private static readonly int PreviousTexturePropertyID = Shader.PropertyToID("PreviousTexture");
 
@@ -106,6 +131,9 @@ public class RayTracedPostProcessor : MonoBehaviour
         PopulateBufferData<Cuboid, Geometry.Structs.Cuboid>(ref _cuboidBuffer, rayMaterial, CuboidBufferPropertyID, CuboidCountPropertyID);
         
         PopulateQuadData(rayMaterial);
+        
+        // We should populate groups last as it relies on indexes from other buffers
+        PopulateMeshData(rayMaterial);
         
         // If we are not accumulating frames, just render the current frame
         if (!accumulateFrames)
@@ -316,11 +344,51 @@ public class RayTracedPostProcessor : MonoBehaviour
         material.SetInt(QuadCountPropertyID, quadData.Length);
     }
 
+    void PopulateMeshData(Material material)
+    {
+        var meshes = FindObjectsByType<Geometry.Mesh>(FindObjectsSortMode.None);
+    
+        _triangleBuffer?.Release();
+        _groupBuffer?.Release();
+        _triangleBuffer = null;
+        _groupBuffer = null;
+    
+        if (meshes.Length == 0)
+        {
+            material.SetInt(GroupedTriangleCountPropertyID, 0);
+            material.SetInt(PrimitiveGroupCountPropertyID, 0);
+            return;
+        }
+
+        var triangles = new System.Collections.Generic.List<Triangle>();
+        var groups = new PrimitiveGroup[meshes.Length];
+
+        foreach (var (mesh, i) in meshes.Select((value, i) => (value, i)))
+        {
+            // Fix: use current triangle count as start index
+            groups[i] = mesh.ToPrimitiveGroup(0, 0, 0, triangles.Count);
+        
+            triangles.AddRange(mesh.Triangles);
+        }
+    
+        _triangleBuffer = new ComputeBuffer(triangles.Count, Marshal.SizeOf<Triangle>());
+        _triangleBuffer.SetData(triangles.ToArray());
+        material.SetBuffer(TriangleBufferPropertyID, _triangleBuffer);
+        material.SetInt(GroupedTriangleCountPropertyID, triangles.Count);
+    
+        _groupBuffer = new ComputeBuffer(groups.Length, Marshal.SizeOf<PrimitiveGroup>());
+        _groupBuffer.SetData(groups);
+        material.SetBuffer(PrimitiveGroupBufferPropertyID, _groupBuffer);
+        material.SetInt(PrimitiveGroupCountPropertyID, groups.Length);
+    }
+
     void ReleaseBuffers()
     {
         _sphereBuffer?.Release();
         _quadBuffer?.Release();
         _cuboidBuffer?.Release();
+        _triangleBuffer?.Release();
+        _groupBuffer?.Release();
     }
 
     void ReleaseAccumulatedTextures()

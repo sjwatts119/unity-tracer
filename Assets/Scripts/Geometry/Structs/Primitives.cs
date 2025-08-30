@@ -31,7 +31,13 @@ namespace Geometry.Structs
         public Materials.Structs.Material material;
     }
     
-    // Implement triangle primitive
+    public struct Triangle : IPrimitive
+    {
+        public Vector3 v0; // First vertex
+        public Vector3 v1; // Second vertex
+        public Vector3 v2; // Third vertex
+        public Materials.Structs.Material material;
+    }
     
     // An abstract group of primitives that can be traced against as one object
     // Bounding box is calculated from the extremities of all primitives in the group
@@ -42,6 +48,6 @@ namespace Geometry.Structs
         public int quadStart; public int quadCount; // Number of quads and starting index in the buffer
         public int cuboidStart; public int cuboidCount; // Number of cuboids and starting index in the buffer
         public int triangleStart; public int triangleCount; // Number of triangles and starting index in the buffer
-        // public AABB boundingBox;
+        public AABB boundingBox;
     }
 }

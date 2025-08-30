@@ -7,17 +7,17 @@ namespace Geometry
 {
     public class Sphere : TraceablePrimitive
     {
-        private Vector3 LocalScale => transform.localScale;
-        
-        private Vector3 LocalPosition => transform.localPosition;
-        
-        private float ScaledRadius => Mathf.Max(LocalScale.x, LocalScale.y, LocalScale.z) * 0.5f;
-        
+        private Vector3 WorldScale => transform.lossyScale;
+    
+        private Vector3 WorldPosition => transform.position;
+    
+        private float ScaledRadius => Mathf.Max(WorldScale.x, WorldScale.y, WorldScale.z) * 0.5f;
+    
         public override IPrimitive ToPrimitive()
         {
             return new Geometry.Structs.Sphere
             {
-                centre = LocalPosition,
+                centre = WorldPosition,
                 radius = ScaledRadius,
                 material = GetMaterial()
             };
