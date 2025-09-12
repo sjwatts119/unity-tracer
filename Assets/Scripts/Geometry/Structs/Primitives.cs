@@ -1,4 +1,5 @@
 ﻿using Geometry.Interfaces;
+using Unity.Mathematics;
 using UnityEngine;
 using Vector3 = UnityEngine.Vector3;
 
@@ -37,6 +38,7 @@ namespace Geometry.Structs
         public Vector3 v1; // Second vertex
         public Vector3 v2; // Third vertex
         public Materials.Structs.Material material;
+        public float3 centroid => (v0 + v1 + v2) * 0.3333f;
     }
     
     // An abstract group of primitives that can be traced against as one object

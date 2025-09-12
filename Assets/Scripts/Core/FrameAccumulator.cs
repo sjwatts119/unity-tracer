@@ -1,5 +1,4 @@
-﻿// Assets/Scripts/RayTracing/FrameAccumulator.cs
-using System;
+﻿using System;
 using UnityEngine;
 
 namespace Core

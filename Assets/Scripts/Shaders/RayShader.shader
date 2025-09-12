@@ -55,6 +55,7 @@ Shader "RayTracer/RayShader"
             {
                 float3 origin;
                 float3 direction;
+                float3 inverseDirection;
             };
 
             struct RayHit
@@ -113,13 +114,12 @@ Shader "RayTracer/RayShader"
                 Material material;
             };
 
-            struct PrimitiveGroup
+            struct BvhNode
             {
-                int sphereStart; int sphereCount;
-                int quadStart; int quadCount;
-                int cuboidStart; int cuboidCount;
-                int triangleStart; int triangleCount;
-                AABB boundingBox;
+                float3 aabbMin;
+                float3 aabbMax;
+                int leftFirst; // If leaf node, index of first primitive. If internal node, index of first child node.
+                int primitiveCount; // If leaf node, number of primitives. If internal node, 0.
             };
 
             /*
@@ -131,6 +131,7 @@ Shader "RayTracer/RayShader"
                 Ray ray;
                 ray.origin = origin;
                 ray.direction = direction;
+                ray.inverseDirection = rcp(direction);
                 return ray;
             }
 
@@ -151,6 +152,14 @@ Shader "RayTracer/RayShader"
                 return interval;
             }
 
+            AABB CreateAABB(float3 min, float3 max)
+            {
+                AABB aabb;
+                aabb.min = min;
+                aabb.max = max;
+                return aabb;
+            }
+
             /*
              * Passed Parameters
              */
@@ -158,26 +167,22 @@ Shader "RayTracer/RayShader"
             // Sphere
             StructuredBuffer<Sphere> SphereBuffer;
             int SphereCount;
-            int GroupedSphereCount;
 
             // Quad
             StructuredBuffer<Quad> QuadBuffer;
             int QuadCount;
-            int GroupedQuadCount;
 
             // Cuboid
             StructuredBuffer<Cuboid> CuboidBuffer;
             int CuboidCount;
-            int GroupedCuboidCount;
 
             // Triangle
             StructuredBuffer<Triangle> TriangleBuffer;
             int TriangleCount;
-            int GroupedTriangleCount;
 
-            // Primitive Group
-            StructuredBuffer<PrimitiveGroup> PrimitiveGroupBuffer;
-            int PrimitiveGroupCount;
+            // Bvh Nodes
+            StructuredBuffer<BvhNode> BvhNodeBuffer;
+            int BvhNodeCount;
 
             // Camera
             float CameraFocalDistance;
@@ -493,9 +498,8 @@ Shader "RayTracer/RayShader"
             // Check if a ray hits an AABB
             bool RayHitsAABB(Ray ray, Interval rayInterval, AABB aabb)
             {
-                float3 invDir = rcp(ray.direction);
                 float tNear, tFar; // Unused out parameters
-                return SlabIntersection(ray.origin, invDir, aabb.min, aabb.max, rayInterval, tNear, tFar);
+                return SlabIntersection(ray.origin, ray.inverseDirection, aabb.min, aabb.max, rayInterval, tNear, tFar);
             }
 
             // Check if a ray hits a cuboid
@@ -733,14 +737,8 @@ Shader "RayTracer/RayShader"
                 closestHit.t = INFINITY;
                 Interval rayInterval = CreateInterval(EPSILON, closestHit.t);
 
-                // Calculate counts for individual primitives (not in groups)
-                int individualTriangleCount = TriangleCount - GroupedTriangleCount;
-                int individualSphereCount = SphereCount - GroupedSphereCount;
-                int individualQuadCount = QuadCount - GroupedQuadCount;
-                int individualCuboidCount = CuboidCount - GroupedCuboidCount;
-
                 // Test individual primitives first
-                for (int i = 0; i < individualSphereCount; i++)
+                for (int i = 0; i < SphereCount; i++)
                 {
                     Sphere sphere = SphereBuffer[i];
                     rayInterval.max = closestHit.t;
@@ -751,7 +749,7 @@ Shader "RayTracer/RayShader"
                     }
                 }
 
-                for (int i = 0; i < individualCuboidCount; i++)
+                for (int i = 0; i < CuboidCount; i++)
                 {
                     Cuboid cuboid = CuboidBuffer[i];
                     rayInterval.max = closestHit.t;
@@ -762,7 +760,7 @@ Shader "RayTracer/RayShader"
                     }
                 }
 
-                for (int i = 0; i < individualQuadCount; i++)
+                for (int i = 0; i < QuadCount; i++)
                 {
                     Quad quad = QuadBuffer[i];
                     rayInterval.max = closestHit.t;
@@ -772,40 +770,72 @@ Shader "RayTracer/RayShader"
                         closestHit = hit;
                     }
                 }
+                
+                // Traverse BVH with distance-ordered traversal
+                int stack[32];
+                int stackPtr = 0;
+                stack[stackPtr++] = 0;
 
-                for (int i = 0; i < individualTriangleCount; i++)
+                while (stackPtr > 0)
                 {
-                    Triangle tri = TriangleBuffer[i];
-                    rayInterval.max = closestHit.t;
-                    RayHit hit = RayHitsTriangle(ray, rayInterval, tri);
-                    if (hit.didHit && hit.t < closestHit.t)
-                    {
-                        closestHit = hit;
-                    }
-                }
-
-                // Test primitive groups with AABB culling
-                for (int i = 0; i < PrimitiveGroupCount; i++)
-                {
-                    PrimitiveGroup group = PrimitiveGroupBuffer[i];
+                    int nodeIndex = stack[--stackPtr];
+                    BvhNode node = BvhNodeBuffer[nodeIndex];
                     
-                    rayInterval.max = closestHit.t;
-                    if (!RayHitsAABB(ray, rayInterval, group.boundingBox))
-                        continue;
-                        
-                    // Test triangles in this group
-                    for (int j = group.triangleStart; j < group.triangleStart + group.triangleCount; j++)
+                    if (node.primitiveCount > 0) // Leaf node
                     {
-                        Triangle tri = TriangleBuffer[j];
-                        rayInterval.max = closestHit.t;
-                        RayHit hit = RayHitsTriangle(ray, rayInterval, tri);
-                        if (hit.didHit && hit.t < closestHit.t)
+                        for (int i = 0; i < node.primitiveCount; i++)
                         {
-                            closestHit = hit;
+                            Triangle tri = TriangleBuffer[node.leftFirst + i];
+                            Interval triInterval = CreateInterval(EPSILON, closestHit.t);
+                            RayHit hit = RayHitsTriangle(ray, triInterval, tri);
+                            if (hit.didHit && hit.t < closestHit.t)
+                            {
+                                closestHit = hit;
+                            }
+                        }
+                    }
+                    else // Internal node
+                    {
+                        int leftIdx = node.leftFirst;
+                        int rightIdx = node.leftFirst + 1;
+                        
+                        // Get distances to both children
+                        float tNearL, tFarL, tNearR, tFarR;
+                        BvhNode leftChild = BvhNodeBuffer[leftIdx];
+                        BvhNode rightChild = BvhNodeBuffer[rightIdx];
+                        
+                        bool hitLeft = SlabIntersection(ray.origin, ray.inverseDirection, 
+                            leftChild.aabbMin, leftChild.aabbMax, 
+                            CreateInterval(EPSILON, closestHit.t), tNearL, tFarL);
+                        bool hitRight = SlabIntersection(ray.origin, ray.inverseDirection, 
+                            rightChild.aabbMin, rightChild.aabbMax, 
+                            CreateInterval(EPSILON, closestHit.t), tNearR, tFarR);
+                        
+                        // Push children in distance order (furthest first, nearest last)
+                        if (hitLeft && hitRight)
+                        {
+                            if (tNearL < tNearR)
+                            {
+                                if (tNearR < closestHit.t) stack[stackPtr++] = rightIdx;
+                                if (tNearL < closestHit.t) stack[stackPtr++] = leftIdx;
+                            }
+                            else
+                            {
+                                if (tNearL < closestHit.t) stack[stackPtr++] = leftIdx;
+                                if (tNearR < closestHit.t) stack[stackPtr++] = rightIdx;
+                            }
+                        }
+                        else if (hitLeft && tNearL < closestHit.t)
+                        {
+                            stack[stackPtr++] = leftIdx;
+                        }
+                        else if (hitRight && tNearR < closestHit.t)
+                        {
+                            stack[stackPtr++] = rightIdx;
                         }
                     }
                 }
-
+                
                 return closestHit;
             }
 

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Geometry.Structs;
 using UnityEngine;
 
 namespace Core
@@ -19,39 +20,36 @@ namespace Core
         private static readonly int CuboidCountID = Shader.PropertyToID("CuboidCount");
         private static readonly int TriangleBufferID = Shader.PropertyToID("TriangleBuffer");
         private static readonly int TriangleCountID = Shader.PropertyToID("TriangleCount");
-        private static readonly int GroupedSphereCountID = Shader.PropertyToID("GroupedSphereCount");
-        private static readonly int GroupedQuadCountID = Shader.PropertyToID("GroupedQuadCount");
-        private static readonly int GroupedCuboidCountID = Shader.PropertyToID("GroupedCuboidCount");
-        private static readonly int GroupedTriangleCountID = Shader.PropertyToID("GroupedTriangleCount");
-        private static readonly int PrimitiveGroupBufferID = Shader.PropertyToID("PrimitiveGroupBuffer");
-        private static readonly int PrimitiveGroupCountID = Shader.PropertyToID("PrimitiveGroupCount");
+        private static readonly int BvhNodeBufferID = Shader.PropertyToID("BvhNodeBuffer");
+        private static readonly int BvhNodeCountID = Shader.PropertyToID("BvhNodeCount");
+        
+        private (Bvh.BvhNode[] nodes, Triangle[] orderedTriangles) _cachedBvhData;
         
         public void CreateBuffersFromSceneData(SceneData data, Material material)
         {
             // Clean up old buffers
             Dispose();
-            
-            // Create buffers for individual primitives
-            CreateBuffer("Spheres", data.individualSpheres.Concat(data.groupedSpheres).ToArray(), 
+    
+            // If the cache hasn't been built yet, or if the triangles have changed, rebuild the BVH
+            if (_cachedBvhData.orderedTriangles == null)
+            {
+                var bvhBuilder = new BvhBuilder(data.triangles);
+                _cachedBvhData = bvhBuilder.Build();
+            }
+    
+            // Create compute buffers for each geometry type
+            CreateBuffer("Spheres", data.spheres.ToArray(), 
                 material, SphereBufferID, SphereCountID);
-            CreateBuffer("Quads", data.individualQuads.Concat(data.groupedQuads).ToArray(), 
+            CreateBuffer("Quads", data.quads.ToArray(), 
                 material, QuadBufferID, QuadCountID);
-            CreateBuffer("Cuboids", data.individualCuboids.Concat(data.groupedCuboids).ToArray(), 
+            CreateBuffer("Cuboids", data.cuboids.ToArray(), 
                 material, CuboidBufferID, CuboidCountID);
-            CreateBuffer("Triangles", data.individualTriangles.Concat(data.groupedTriangles).ToArray(), 
+    
+            // Use the reordered triangles from BVH builder instead of original triangles
+            CreateBuffer("Triangles", _cachedBvhData.orderedTriangles, 
                 material, TriangleBufferID, TriangleCountID);
-            
-            // Set grouped primitive counts
-            material.SetInt(GroupedSphereCountID, data.groupedSpheres.Length);
-            material.SetInt(GroupedQuadCountID, data.groupedQuads.Length);
-            material.SetInt(GroupedCuboidCountID, data.groupedCuboids.Length);
-            material.SetInt(GroupedTriangleCountID, data.groupedTriangles.Length);
-            
-            // Create primitive group buffer
-            CreateBuffer("PrimitiveGroups", data.primitiveGroups, 
-                material, PrimitiveGroupBufferID, PrimitiveGroupCountID);
-            
-            // TODO add BVH node buffers
+            CreateBuffer("BvhNodes", _cachedBvhData.nodes, 
+                material, BvhNodeBufferID, BvhNodeCountID);
         }
         
         private void CreateBuffer<T>(string key, T[] data, Material material, 

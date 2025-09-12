@@ -1,26 +1,13 @@
-﻿// Assets/Scripts/Geometry/Mesh.cs
-
-using System;
+﻿using System;
 using Geometry.Abstract;
 using Geometry.Structs;
 using UnityEngine;
 
 namespace Geometry
 {
-    public class Mesh : TraceableGroup
+    public class Mesh : Traceable
     {
-        public override PrimitiveCollection GetPrimitives()
-        {
-            return new PrimitiveCollection
-            {
-                spheres = Array.Empty<Geometry.Structs.Sphere>(),
-                quads  = Array.Empty<Geometry.Structs.Quad>(),
-                cuboids = Array.Empty<Geometry.Structs.Cuboid>(),
-                triangles = GetTriangles()
-            };
-        }
-        
-        private Triangle[] GetTriangles()
+        public Triangle[] GetPrimitives()
         {
             var mesh = GetComponent<MeshFilter>().sharedMesh;
             var triangles = mesh.triangles;
@@ -44,9 +31,9 @@ namespace Geometry
             return primitives;
         }
 
-        public override AABB ToAABB()
+        public AABB ToAABB()
         {
-            var triangles = GetTriangles();
+            var triangles = GetPrimitives();
             
             if (triangles.Length == 0)
             {

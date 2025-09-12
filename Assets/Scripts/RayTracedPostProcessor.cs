@@ -1,4 +1,3 @@
-// Assets/Scripts/RayTracedPostProcessor.cs
 using System;
 using Core;
 using UnityEngine;
@@ -7,6 +6,9 @@ using Shaders;
 [ExecuteAlways, ImageEffectAllowedInSceneView]
 public class RayTracedPostProcessor : MonoBehaviour
 {
+    [Header("General")]
+    public bool rayTraced = true;
+    
     [Header("Info")] public int accumulatedFrames;
 
     [Header("Anti-Aliasing")]
@@ -96,6 +98,12 @@ public class RayTracedPostProcessor : MonoBehaviour
     
     public void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
+        if (!rayTraced)
+        {
+            Graphics.Blit(source, destination);
+            return;
+        }
+        
         var sceneData = _sceneProvider.GatherSceneData();
         
         _bufferManager.CreateBuffersFromSceneData(sceneData, _rayMaterial);

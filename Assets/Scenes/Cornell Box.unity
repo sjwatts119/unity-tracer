@@ -269,7 +269,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 14d75b51fae386341a4f1703729772a0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  renderedFrames: 0
+  accumulatedFrames: 0
   samplesPerPixel: 27
   rayMaxDepth: 150
   accumulateFrames: 1
