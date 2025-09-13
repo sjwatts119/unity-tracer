@@ -6,20 +6,23 @@ namespace Materials.Structs
     [System.Serializable]
     public enum MaterialType
     {
-        Lambertian = 0,
-        Metal = 1,
-        Dielectric = 2,
-        Light = 3,
+        Solid = 0,
+        Dielectric = 1,
+        Emissive = 2,
     }
-
+    
     [System.Serializable]
     public struct Material
     {
         public MaterialType type;
-        public Vector3 albedo;
-        public float fuzz;
-        public float refractiveIndex;
-        public Vector3 emission;
-        public float emissionStrength;
+        public Vector3 colour;
+        
+        public float reflectivity; // Likelihood of diffuse reflection vs specular reflection
+        public float roughness; // Affects the spread of specular reflections, does not affect diffuse reflections
+        
+        public float refractiveIndex; // The refractive index of the material
+        public float absorptionStrength; // The amount the colour attenuates the ray
+        
+        public float emissionStrength; // The brightness of the emission
     }
 }

@@ -21,10 +21,9 @@ Shader "RayTracer/RayShader"
              * Material Types
              */
             
-            #define MATERIAL_LAMBERTIAN 0
-            #define MATERIAL_METAL 1
-            #define MATERIAL_DIELECTRIC 2
-            #define MATERIAL_LIGHT 3
+            #define MATERIAL_SOLID 0
+            #define MATERIAL_DIELECTRIC 1
+            #define MATERIAL_EMISSIVE 2
 
             /*
              * Structs
@@ -45,10 +44,14 @@ Shader "RayTracer/RayShader"
             struct Material
             {
                 int type;
-                float3 albedo;
-                float fuzz;
+                float3 colour;
+                
+                float reflectivity;
+                float roughness;
+                
                 float refractiveIndex;
-                float3 emission;
+                float absorptionStrength;
+                
                 float emissionStrength;
             };
             
@@ -359,9 +362,38 @@ Shader "RayTracer/RayShader"
              * Material scattering
              */
 
-            // Scatter the ray for a Lambertian (diffuse) material
-            RayScatter ScatterLambertian(Ray ray, RayHit hit, Material material, inout uint seed)
+            // Scatter the ray for a Metal material
+            RayScatter ScatterMetal(Ray ray, RayHit hit, Material material, inout uint seed)
             {
+                RayScatter scatter;
+
+                // Reflect the ray direction around the normal
+                float3 reflectDirection = reflect(ray.direction, hit.normal);
+
+                if (material.roughness > 0.0)
+                {
+                    reflectDirection = normalize(reflectDirection) + (PCGRandomUnitVector(seed) * material.roughness);
+                }
+
+                scatter.scatteredRay = CreateRay(hit.position + hit.normal * OFFSET_EPSILON, normalize(reflectDirection));
+                scatter.attenuation = material.colour;
+                scatter.emission = float3 (0, 0, 0);
+
+                // Our ray was scattered if the scattered direction is in the same hemisphere as the normal (it bounced off instead of being absorbed)
+                scatter.didScatter = dot(scatter.scatteredRay.direction, hit.normal) > 0;
+
+                return scatter;
+            }
+
+            // Scatter the ray for a Lambertian (diffuse) material
+            RayScatter ScatterSolid(Ray ray, RayHit hit, Material material, inout uint seed)
+            {
+                // If the material has reflectivity, we need to decide whether to reflect or scatter diffusely
+                if (material.reflectivity > PCGRandomFloat(seed))
+                {
+                    return ScatterMetal(ray, hit, material, seed);
+                }
+
                 RayScatter scatter;
 
                 // Scatter the ray in a random direction against the normal (using cosine-weighted hemisphere sampling)
@@ -376,32 +408,9 @@ Shader "RayTracer/RayShader"
                 // Build up the scatter info
                 // scatter.scatteredRay = CreateRay(hit.position, normalize(scatterDirection));
                 scatter.scatteredRay = CreateRay(hit.position + hit.normal * OFFSET_EPSILON, normalize(scatterDirection));
-                scatter.attenuation = material.albedo;
+                scatter.attenuation = material.colour;
                 scatter.emission = float3 (0, 0, 0); // Lambertian surfaces
                 scatter.didScatter = true; // Lambertian always scatters
-
-                return scatter;
-            }
-
-            // Scatter the ray for a Metal material
-            RayScatter ScatterMetal(Ray ray, RayHit hit, Material material, inout uint seed)
-            {
-                RayScatter scatter;
-
-                // Reflect the ray direction around the normal
-                float3 reflectDirection = reflect(ray.direction, hit.normal);
-
-                if (material.fuzz > 0.0)
-                {
-                    reflectDirection = normalize(reflectDirection) + (PCGRandomUnitVector(seed) * material.fuzz);
-                }
-
-                scatter.scatteredRay = CreateRay(hit.position + hit.normal * OFFSET_EPSILON, normalize(reflectDirection));
-                scatter.attenuation = material.albedo;
-                scatter.emission = float3 (0, 0, 0);
-
-                // Our ray was scattered if the scattered direction is in the same hemisphere as the normal (it bounced off instead of being absorbed)
-                scatter.didScatter = dot(scatter.scatteredRay.direction, hit.normal) > 0;
 
                 return scatter;
             }
@@ -411,7 +420,16 @@ Shader "RayTracer/RayShader"
             {
                 RayScatter scatter;
                 
-                float3 attenuation = float3(1, 1, 1); // For now, dielectrics don't attenuate the ray (no colour change)
+                float3 attenuation = float3(1, 1, 1);
+
+                // Handle absorption for rays inside the material
+                if (!hit.frontFace && material.absorptionStrength > 0.0)
+                {
+                    // Invert the colour to get the absorption coefficient
+                    float3 absorptionCoeff = (1.0 - material.colour) * material.absorptionStrength;
+                    attenuation = exp(-absorptionCoeff * hit.t);
+                }
+                
                 float refractionRatio = hit.frontFace ? (rcp(material.refractiveIndex)) : material.refractiveIndex;
 
                 // Calculate reflection and refraction directions
@@ -445,13 +463,13 @@ Shader "RayTracer/RayShader"
                 return scatter;
             }
 
-            RayScatter ScatterLight(Ray ray, RayHit hit, Material material, inout uint seed)
+            RayScatter ScatterEmissive(Ray ray, RayHit hit, Material material, inout uint seed)
             {
                 RayScatter scatter;
                 scatter.scatteredRay = ray; // Purely because this property needs to be set, it gets ignored when checking didScatter
                 scatter.didScatter = false; // We can consider this ray absorbed, its tracing terminates at the light source
                 scatter.attenuation = float3(0, 0, 0);
-                scatter.emission = material.emission * material.emissionStrength;
+                scatter.emission = material.colour * material.emissionStrength;
                 return scatter;
             }
 
@@ -460,14 +478,12 @@ Shader "RayTracer/RayShader"
             {
                 switch (material.type)
                 {
-                    case MATERIAL_LAMBERTIAN:
-                        return ScatterLambertian(ray, hit, material, seed);
-                    case MATERIAL_METAL:
-                        return ScatterMetal(ray, hit, material, seed);
+                    case MATERIAL_SOLID:
+                        return ScatterSolid(ray, hit, material, seed);
                     case MATERIAL_DIELECTRIC:
                         return ScatterDielectric(ray, hit, material, seed);
-                    case MATERIAL_LIGHT:
-                        return ScatterLight(ray, hit, material, seed);
+                    case MATERIAL_EMISSIVE:
+                        return ScatterEmissive(ray, hit, material, seed);
                     default:
                         RayScatter noScatter;
                         noScatter.scatteredRay = ray; // Purely because this property needs to be set, it gets ignored when checking didScatter

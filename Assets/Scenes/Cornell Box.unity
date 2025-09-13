@@ -269,141 +269,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 14d75b51fae386341a4f1703729772a0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  rayTraced: 1
   accumulatedFrames: 0
-  samplesPerPixel: 27
+  samplesPerPixel: 50
   rayMaxDepth: 150
   accumulateFrames: 1
   cameraFocalDistance: 10.8
   cameraDefocusAngle: 0
   accumulationShader: {fileID: 4800000, guid: 525c156c2d8b497299080b9f4951ba81, type: 3}
   exportAtFrame: 100
---- !u!1 &374052898
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 374052903}
-  - component: {fileID: 374052902}
-  - component: {fileID: 374052901}
-  - component: {fileID: 374052900}
-  - component: {fileID: 374052899}
-  m_Layer: 0
-  m_Name: Left Metal Marble
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &374052899
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 374052898}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8c2e710842bc4d15b65b539b69413ef8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  materialType: 1
-  albedo: {r: 1, g: 1, b: 1, a: 1}
-  fuzz: 0.5
-  refractiveIndex: 1
-  emission: {r: 0, g: 0, b: 0, a: 1}
-  emissionStrength: 0
---- !u!135 &374052900
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 374052898}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 0.5
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!23 &374052901
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 374052898}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!33 &374052902
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 374052898}
-  m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
---- !u!4 &374052903
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 374052898}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -1, y: 10.5, z: 11.75}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -558,10 +432,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   materialType: 0
-  albedo: {r: 0, g: 1, b: 0, a: 1}
-  fuzz: 0
+  colour: {r: 0, g: 1, b: 0, a: 1}
+  roughness: 0
+  reflectivity: 0.25
   refractiveIndex: 1
-  emission: {r: 0, g: 0, b: 0, a: 1}
+  absorptionStrength: 0
   emissionStrength: 0
 --- !u!64 &592022957
 MeshCollider:
@@ -672,7 +547,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &604125065
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -685,11 +560,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 792810fc296e4cd2aab84590e02564f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  materialType: 3
-  albedo: {r: 1, g: 1, b: 1, a: 1}
-  fuzz: 0
+  materialType: 2
+  colour: {r: 1, g: 1, b: 1, a: 1}
+  roughness: 0
+  reflectivity: 0
   refractiveIndex: 1
-  emission: {r: 1, g: 0.99660856, b: 0.76792455, a: 1}
+  absorptionStrength: 0
   emissionStrength: 10
 --- !u!64 &604125066
 MeshCollider:
@@ -781,133 +657,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 90}
---- !u!1 &652891026
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 652891031}
-  - component: {fileID: 652891030}
-  - component: {fileID: 652891029}
-  - component: {fileID: 652891028}
-  - component: {fileID: 652891027}
-  m_Layer: 0
-  m_Name: Left Marble
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &652891027
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 652891026}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8c2e710842bc4d15b65b539b69413ef8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  materialType: 2
-  albedo: {r: 1, g: 1, b: 1, a: 1}
-  fuzz: 0
-  refractiveIndex: 1.45
-  emission: {r: 0, g: 0, b: 0, a: 1}
-  emissionStrength: 0
---- !u!135 &652891028
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 652891026}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 0.5
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!23 &652891029
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 652891026}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!33 &652891030
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 652891026}
-  m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
---- !u!4 &652891031
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 652891026}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.25, y: 10.5, z: 13.75}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -989,11 +738,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27834bd7755143e2a306086ebdab601f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  materialType: 2
-  albedo: {r: 1, g: 1, b: 1, a: 1}
-  fuzz: 0
-  refractiveIndex: 1.4
-  emission: {r: 0, g: 0, b: 0, a: 1}
+  materialType: 1
+  colour: {r: 1, g: 1, b: 1, a: 1}
+  roughness: 0
+  reflectivity: 0
+  refractiveIndex: 1.46
+  absorptionStrength: 0
   emissionStrength: 0
 --- !u!65 &1277118373
 BoxCollider:
@@ -1077,13 +827,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1277118371}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: -0.38268343, z: 0, w: 0.92387956}
+  m_LocalRotation: {x: 0, y: -0.19509031, z: 0, w: 0.98078537}
   m_LocalPosition: {x: -2, y: 11.79, z: 17.5}
   m_LocalScale: {x: 2.5, y: 3.5, z: 2.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: -45, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: -22.5, z: 0}
 --- !u!1 &1320208949
 GameObject:
   m_ObjectHideFlags: 0
@@ -1116,11 +866,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8c2e710842bc4d15b65b539b69413ef8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  materialType: 1
-  albedo: {r: 1, g: 1, b: 1, a: 1}
-  fuzz: 0
+  materialType: 0
+  colour: {r: 1, g: 1, b: 1, a: 1}
+  roughness: 0.642
+  reflectivity: 1
   refractiveIndex: 1
-  emission: {r: 0, g: 0, b: 0, a: 1}
+  absorptionStrength: 0
   emissionStrength: 0
 --- !u!135 &1320208951
 SphereCollider:
@@ -1244,10 +995,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   materialType: 0
-  albedo: {r: 1, g: 0, b: 0, a: 1}
-  fuzz: 0
+  colour: {r: 1, g: 0, b: 0, a: 1}
+  roughness: 0
+  reflectivity: 0.25
   refractiveIndex: 1
-  emission: {r: 0, g: 0, b: 0, a: 1}
+  absorptionStrength: 0
   emissionStrength: 0
 --- !u!64 &1370757451
 MeshCollider:
@@ -1372,10 +1124,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   materialType: 0
-  albedo: {r: 1, g: 1, b: 1, a: 1}
-  fuzz: 0
+  colour: {r: 1, g: 1, b: 1, a: 1}
+  roughness: 0
+  reflectivity: 0.25
   refractiveIndex: 1
-  emission: {r: 0, g: 0, b: 0, a: 1}
+  absorptionStrength: 0
   emissionStrength: 0
 --- !u!64 &1503469472
 MeshCollider:
@@ -1500,10 +1253,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   materialType: 0
-  albedo: {r: 1, g: 1, b: 1, a: 1}
-  fuzz: 0
+  colour: {r: 1, g: 1, b: 1, a: 1}
+  roughness: 0
+  reflectivity: 0
   refractiveIndex: 1
-  emission: {r: 0, g: 0, b: 0, a: 1}
+  absorptionStrength: 0
   emissionStrength: 0
 --- !u!65 &1772928798
 BoxCollider:
@@ -1627,10 +1381,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   materialType: 0
-  albedo: {r: 1, g: 1, b: 1, a: 1}
-  fuzz: 0
+  colour: {r: 1, g: 1, b: 1, a: 1}
+  roughness: 0
+  reflectivity: 0.25
   refractiveIndex: 1
-  emission: {r: 0, g: 0, b: 0, a: 1}
+  absorptionStrength: 0
   emissionStrength: 0
 --- !u!64 &1868878630
 MeshCollider:
@@ -1754,12 +1509,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 792810fc296e4cd2aab84590e02564f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  materialType: 3
-  albedo: {r: 1, g: 1, b: 1, a: 1}
-  fuzz: 0
+  materialType: 2
+  colour: {r: 1, g: 1, b: 1, a: 1}
+  roughness: 0
+  reflectivity: 0
   refractiveIndex: 1
-  emission: {r: 1, g: 0.99660856, b: 0.76792455, a: 1}
-  emissionStrength: 10
+  absorptionStrength: 0
+  emissionStrength: 11.3
 --- !u!64 &1926110888
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -1882,11 +1638,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8c2e710842bc4d15b65b539b69413ef8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  materialType: 2
-  albedo: {r: 1, g: 1, b: 1, a: 1}
-  fuzz: 0
-  refractiveIndex: 1.515
-  emission: {r: 0, g: 0, b: 0, a: 1}
+  materialType: 1
+  colour: {r: 0, g: 0, b: 0, a: 1}
+  roughness: 0
+  reflectivity: 0
+  refractiveIndex: 1.496
+  absorptionStrength: 3
   emissionStrength: 0
 --- !u!135 &2051653971
 SphereCollider:
@@ -2010,10 +1767,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   materialType: 0
-  albedo: {r: 1, g: 1, b: 1, a: 1}
-  fuzz: 0
+  colour: {r: 1, g: 1, b: 1, a: 1}
+  roughness: 0
+  reflectivity: 0.25
   refractiveIndex: 1
-  emission: {r: 0, g: 0, b: 0, a: 1}
+  absorptionStrength: 0
   emissionStrength: 0
 --- !u!64 &2084130522
 MeshCollider:
@@ -2122,6 +1880,4 @@ SceneRoots:
   - {fileID: 1772928801}
   - {fileID: 1277118376}
   - {fileID: 2051653974}
-  - {fileID: 652891031}
-  - {fileID: 374052903}
   - {fileID: 1320208954}

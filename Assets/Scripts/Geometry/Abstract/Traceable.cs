@@ -8,23 +8,27 @@ namespace Geometry.Abstract
     {
         [Header("Material Properties")]
         [SerializeField]
-        private MaterialType materialType = MaterialType.Lambertian;
+        private MaterialType materialType = MaterialType.Solid;
         
-        [Header("Base Properties")]
+        [Header("Solid Properties")]
         [SerializeField, ColorUsage(false)]
-        private Color albedo = Color.white;
+        private Color colour = Color.white;
         
-        [Header("Metal Properties")]
+        [Header("Solid Properties")]
         [SerializeField, Range(0f, 1f)]
-        private float fuzz = 0.0f;
+        private float roughness = 0.0f;
+        
+        [Header("Solid Properties")]
+        [SerializeField, Range(0f, 1f)]
+        private float reflectivity = 0.5f;
         
         [Header("Dielectric Properties")]
         [SerializeField, Range(1.0f, 3.0f)]
         private float refractiveIndex = 1.5f;
-        
-        [Header("Emission Properties")]
-        [SerializeField, ColorUsage(false)]
-        private Color emission = Color.black;
+
+        [Header("Dielectric Properties")] 
+        [SerializeField, Range(0f, 3f)]
+        private float absorptionStrength = 0f;
         
         [Header("Emission Properties")]
         [SerializeField, Range(0f, 30f)]
@@ -35,10 +39,11 @@ namespace Geometry.Abstract
             return new Materials.Structs.Material
             {
                 type = materialType,
-                albedo = new Vector3(albedo.r, albedo.g, albedo.b),
-                fuzz = fuzz,
+                colour = new Vector3(colour.r, colour.g, colour.b),
+                reflectivity = reflectivity,
+                roughness = roughness,
                 refractiveIndex = refractiveIndex,
-                emission = new Vector3(emission.r, emission.g, emission.b),
+                absorptionStrength = absorptionStrength,
                 emissionStrength = emissionStrength
             };
         }
@@ -52,17 +57,14 @@ namespace Geometry.Abstract
         {
             switch (materialType) 
             {
-                case MaterialType.Lambertian:
-                    ValidateLambertian();
-                    break;
-                case MaterialType.Metal:
-                    ValidateMetal();
+                case MaterialType.Solid:
+                    ValidateSolid();
                     break;
                 case MaterialType.Dielectric:
                     ValidateDielectric();
                     break;
-                case MaterialType.Light:
-                    ValidateLight();
+                case MaterialType.Emissive:
+                    ValidateEmissive();
                     break;
                 default:
                     Debug.LogError($"Unknown material type on {gameObject.name}");
@@ -70,66 +72,46 @@ namespace Geometry.Abstract
             }
         }
 
-        private void ValidateLambertian()
+        private void ValidateSolid()
         {
-            emission = Color.black;
-            emissionStrength = 0f;
-            fuzz = 0f;
-            refractiveIndex = 1f;
-            
-            albedo = new Color(
-                Mathf.Clamp01(albedo.r),
-                Mathf.Clamp01(albedo.g),
-                Mathf.Clamp01(albedo.b),
-                albedo.a
-            );
-        }
-
-        private void ValidateMetal()
-        {
-            emission = Color.black;
+            absorptionStrength = 0f;
             emissionStrength = 0f;
             refractiveIndex = 1f;
+            roughness = Mathf.Clamp01(roughness);
             
-            albedo = new Color(
-                Mathf.Clamp01(albedo.r),
-                Mathf.Clamp01(albedo.g),
-                Mathf.Clamp01(albedo.b),
-                albedo.a
+            colour = new Color(
+                Mathf.Clamp01(colour.r),
+                Mathf.Clamp01(colour.g),
+                Mathf.Clamp01(colour.b),
+                colour.a
             );
-            
-            fuzz = Mathf.Clamp01(fuzz);
         }
 
         private void ValidateDielectric()
         {
-            emission = Color.black;
             emissionStrength = 0f;
-            fuzz = 0f;
+            roughness = 0f;
+            reflectivity = 0f;
             
-            albedo = new Color(
-                Mathf.Clamp01(albedo.r),
-                Mathf.Clamp01(albedo.g),
-                Mathf.Clamp01(albedo.b),
-                albedo.a
+            colour = new Color(
+                Mathf.Clamp01(colour.r),
+                Mathf.Clamp01(colour.g),
+                Mathf.Clamp01(colour.b),
+                colour.a
             );
         }
         
-        private void ValidateLight()
+        private void ValidateEmissive()
         {
-            fuzz = 0f;
             refractiveIndex = 1f;
+            roughness = 0f;
+            reflectivity = 0f;
+            absorptionStrength = 0f;
             
-            albedo = new Color(
-                Mathf.Clamp01(albedo.r),
-                Mathf.Clamp01(albedo.g),
-                Mathf.Clamp01(albedo.b)
-            );
-            
-            emission = new Color(
-                Mathf.Clamp01(emission.r),
-                Mathf.Clamp01(emission.g),
-                Mathf.Clamp01(emission.b)
+            colour = new Color(
+                Mathf.Clamp01(colour.r),
+                Mathf.Clamp01(colour.g),
+                Mathf.Clamp01(colour.b)
             );
         }
     }
