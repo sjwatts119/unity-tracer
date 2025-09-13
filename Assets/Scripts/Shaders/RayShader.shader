@@ -592,6 +592,12 @@ Shader "RayTracer/RayShader"
                 // Initialise hit info with hit set to false for now
                 RayHit hit = (RayHit)0;
 
+                // Cull backfaces
+                if (denom <= 0)
+                {
+                    return hit; // Skip backface intersections
+                }
+
                 if (abs(denom) < INTERSECTION_EPSILON)
                 {
                     return hit; // Ray is parallel to the quad plane, so no intersection
