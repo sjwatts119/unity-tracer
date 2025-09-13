@@ -14,11 +14,9 @@ namespace Geometry.Abstract
         [SerializeField, ColorUsage(false)]
         private Color colour = Color.white;
         
-        [Header("Solid Properties")]
         [SerializeField, Range(0f, 1f)]
         private float roughness = 0.0f;
         
-        [Header("Solid Properties")]
         [SerializeField, Range(0f, 1f)]
         private float reflectivity = 0.5f;
         
@@ -26,7 +24,6 @@ namespace Geometry.Abstract
         [SerializeField, Range(1.0f, 3.0f)]
         private float refractiveIndex = 1.5f;
 
-        [Header("Dielectric Properties")] 
         [SerializeField, Range(0f, 3f)]
         private float absorptionStrength = 0f;
         
