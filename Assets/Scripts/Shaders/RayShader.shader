@@ -14,7 +14,8 @@ Shader "RayTracer/RayShader"
              */
             
             #define INFINITY (1.0 / 0.0) // Positive infinity
-            #define EPSILON 0.001       // A small value to offset rays to avoid self-intersection
+            #define INTERSECTION_EPSILON 1e-5 // Epsilon for intersection tests
+            #define OFFSET_EPSILON 1e-3 // Epsilon to avoid self-intersection when offsetting ray origins
 
             /*
              * Material Types
@@ -367,13 +368,14 @@ Shader "RayTracer/RayShader"
                 float3 scatterDirection = hit.normal + PCGRandomDirection(seed);
 
                 // Handle the degenerate case where the scatter direction is near zero
-                if (any(abs(scatterDirection) < EPSILON))
+                if (any(abs(scatterDirection) < INTERSECTION_EPSILON))
                 {
                     scatterDirection = hit.normal; // Fallback to normal direction
                 }
 
                 // Build up the scatter info
-                scatter.scatteredRay = CreateRay(hit.position, normalize(scatterDirection));
+                // scatter.scatteredRay = CreateRay(hit.position, normalize(scatterDirection));
+                scatter.scatteredRay = CreateRay(hit.position + hit.normal * OFFSET_EPSILON, normalize(scatterDirection));
                 scatter.attenuation = material.albedo;
                 scatter.emission = float3 (0, 0, 0); // Lambertian surfaces
                 scatter.didScatter = true; // Lambertian always scatters
@@ -394,7 +396,7 @@ Shader "RayTracer/RayShader"
                     reflectDirection = normalize(reflectDirection) + (PCGRandomUnitVector(seed) * material.fuzz);
                 }
 
-                scatter.scatteredRay = CreateRay(hit.position, normalize(reflectDirection));
+                scatter.scatteredRay = CreateRay(hit.position + hit.normal * OFFSET_EPSILON, normalize(reflectDirection));
                 scatter.attenuation = material.albedo;
                 scatter.emission = float3 (0, 0, 0);
 
@@ -436,7 +438,7 @@ Shader "RayTracer/RayShader"
                 }
 
                 // Populate the scatter info
-                scatter.scatteredRay = CreateRay(hit.position + offsetDirection * EPSILON, direction);
+                scatter.scatteredRay = CreateRay(hit.position + offsetDirection * OFFSET_EPSILON, direction);
                 scatter.attenuation = attenuation;
                 scatter.emission = float3 (0, 0, 0);
                 scatter.didScatter = true; // Dielectric always scatters
@@ -544,9 +546,9 @@ Shader "RayTracer/RayShader"
                 float3 localNormal;
 
                 // Determine which face was hit based on the largest component of the normalised hit point
-                if (faceDistance.x > faceDistance.y - EPSILON && faceDistance.x > faceDistance.z - EPSILON)
+                if (faceDistance.x > faceDistance.y - INTERSECTION_EPSILON && faceDistance.x > faceDistance.z - INTERSECTION_EPSILON)
                     localNormal = float3(sign(localHitPoint.x), 0, 0);
-                else if (faceDistance.y > faceDistance.z - EPSILON)  
+                else if (faceDistance.y > faceDistance.z - INTERSECTION_EPSILON)  
                     localNormal = float3(0, sign(localHitPoint.y), 0);
                 else
                     localNormal = float3(0, 0, sign(localHitPoint.z));
@@ -574,7 +576,7 @@ Shader "RayTracer/RayShader"
                 // Initialise hit info with hit set to false for now
                 RayHit hit = (RayHit)0;
 
-                if (abs(denom) < EPSILON)
+                if (abs(denom) < INTERSECTION_EPSILON)
                 {
                     return hit; // Ray is parallel to the quad plane, so no intersection
                 }
@@ -678,7 +680,7 @@ Shader "RayTracer/RayShader"
                 float a = dot(edge1, h);
 
                 // If the determinant is near zero, the ray is parallel to the triangle plane
-                if (abs(a) < EPSILON)
+                if (abs(a) < INTERSECTION_EPSILON)
                 {
                     return hit; // Ray is parallel to the triangle, so no intersection
                 }
@@ -735,7 +737,7 @@ Shader "RayTracer/RayShader"
             {
                 RayHit closestHit = (RayHit)0;
                 closestHit.t = INFINITY;
-                Interval rayInterval = CreateInterval(EPSILON, closestHit.t);
+                Interval rayInterval = CreateInterval(INTERSECTION_EPSILON, closestHit.t);
 
                 // Test individual primitives first
                 for (int i = 0; i < SphereCount; i++)
@@ -786,7 +788,7 @@ Shader "RayTracer/RayShader"
                         for (int i = 0; i < node.primitiveCount; i++)
                         {
                             Triangle tri = TriangleBuffer[node.leftFirst + i];
-                            Interval triInterval = CreateInterval(EPSILON, closestHit.t);
+                            Interval triInterval = CreateInterval(INTERSECTION_EPSILON, closestHit.t);
                             RayHit hit = RayHitsTriangle(ray, triInterval, tri);
                             if (hit.didHit && hit.t < closestHit.t)
                             {
@@ -806,10 +808,10 @@ Shader "RayTracer/RayShader"
                         
                         bool hitLeft = SlabIntersection(ray.origin, ray.inverseDirection, 
                             leftChild.aabbMin, leftChild.aabbMax, 
-                            CreateInterval(EPSILON, closestHit.t), tNearL, tFarL);
+                            CreateInterval(INTERSECTION_EPSILON, closestHit.t), tNearL, tFarL);
                         bool hitRight = SlabIntersection(ray.origin, ray.inverseDirection, 
                             rightChild.aabbMin, rightChild.aabbMax, 
-                            CreateInterval(EPSILON, closestHit.t), tNearR, tFarR);
+                            CreateInterval(INTERSECTION_EPSILON, closestHit.t), tNearR, tFarR);
                         
                         // Push children in distance order (furthest first, nearest last)
                         if (hitLeft && hitRight)

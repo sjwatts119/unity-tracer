@@ -838,7 +838,7 @@ MonoBehaviour:
   materialType: 2
   albedo: {r: 1, g: 1, b: 1, a: 1}
   fuzz: 0
-  refractiveIndex: 1.449
+  refractiveIndex: 1.359
   emission: {r: 0, g: 0, b: 0, a: 1}
   emissionStrength: 0
 --- !u!1 &1370757449
