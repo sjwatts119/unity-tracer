@@ -37,6 +37,9 @@ namespace Geometry.Structs
         public Vector3 v0; // First vertex
         public Vector3 v1; // Second vertex
         public Vector3 v2; // Third vertex
+        public Vector3 n0; // First vertex normal
+        public Vector3 n1; // Second vertex normal
+        public Vector3 n2; // Third vertex normal
         public Materials.Structs.Material material;
         public float3 centroid => (v0 + v1 + v2) * 0.3333f;
     }

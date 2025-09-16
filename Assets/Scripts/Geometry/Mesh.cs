@@ -1,5 +1,4 @@
-﻿using System;
-using Geometry.Abstract;
+﻿using Geometry.Abstract;
 using Geometry.Structs;
 using UnityEngine;
 
@@ -12,18 +11,38 @@ namespace Geometry
             var mesh = GetComponent<MeshFilter>().sharedMesh;
             var triangles = mesh.triangles;
             var vertices = mesh.vertices;
+            var normals = mesh.normals;
+            
+            // If the mesh doesn't have normals, generate them
+            if (normals == null || normals.Length == 0)
+            {
+                Debug.LogWarning($"Mesh {mesh.name} has no normals, recalculating...");
+                mesh.RecalculateNormals();
+                normals = mesh.normals;
+            }
+            
             var primitives = new Triangle[triangles.Length / 3];
             
             for (var i = 0; i < triangles.Length; i += 3)
             {
+                // Transform vertices to world space
                 var v0 = transform.TransformPoint(vertices[triangles[i]]);
                 var v1 = transform.TransformPoint(vertices[triangles[i + 1]]);
                 var v2 = transform.TransformPoint(vertices[triangles[i + 2]]);
+                
+                // Transform normals to world space
+                var n0 = transform.TransformDirection(normals[triangles[i]]).normalized;
+                var n1 = transform.TransformDirection(normals[triangles[i + 1]]).normalized;
+                var n2 = transform.TransformDirection(normals[triangles[i + 2]]).normalized;
+                
                 primitives[i / 3] = new Triangle
                 {
                     v0 = v0,
                     v1 = v1,
                     v2 = v2,
+                    n0 = n0,
+                    n1 = n1,
+                    n2 = n2,
                     material = GetMaterial()
                 };
             }

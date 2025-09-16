@@ -115,6 +115,9 @@ Shader "RayTracer/RayShader"
                 float3 v0;
                 float3 v1;
                 float3 v2;
+                float3 n0;
+                float3 n1;
+                float3 n2;
                 Material material;
             };
 
@@ -740,12 +743,18 @@ Shader "RayTracer/RayShader"
                     return hit; // Intersection is outside the ray interval
                 }
 
+                // Calculate barycentric coordinates for normal interpolation
+                float w = 1.0 - u - v; // Third barycentric coordinate
+                
+                // Interpolate the vertex normals using barycentric coordinates
+                float3 interpolatedNormal = normalize(w * tri.n0 + u * tri.n1 + v * tri.n2);
+
                 // We have a valid intersection, so populate the hit info
                 hit.didHit = true;
                 hit.t = t;
                 hit.position = ray.origin + t * ray.direction;
                 hit.material = tri.material;
-                hit = RayHitSetFaceNormal(hit, ray, normalize(cross(edge1, edge2)));
+                hit = RayHitSetFaceNormal(hit, ray, interpolatedNormal);
 
                 return hit;
             }
